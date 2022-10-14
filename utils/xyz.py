@@ -16,25 +16,41 @@ def gamma(x, L=4):
 def positional_encoder(vec, Lp=10, Ld=4):
 	""" applies positional encoding to input vector vec (5x1) 
 	Args:
-		vec (torch tensor: Nx5): x,y,z,theta,phi
-		Lx: number of levels for x,y,z
-		Ld: number of levels for theta, phi 
+		vec (torch tensor: Bx6): x, y, z, d1, d2, d3
+		Lx: number of levels for x, y, z
+		Ld: number of levels for d1, d2, d3 
 	Returns:
-		posx, posd (torch tensors): N x 3*2*Lx, N x 3*2*Ld
+		posx, posd (torch tensors): B x 3*2*Lx, B x 3*2*Ld
 	"""
-	x,y,z,theta,phi = vec[:,0:1], vec[:,1:2], vec[:,2:3], vec[:,3:4], vec[:,4:5] 
+	x,y,z,d1,d2,d3 = vec[:,0:1], vec[:,1:2], vec[:,2:3], vec[:,3:4], vec[:,4:5], vec[:,5:6] 
 	pos_x = gamma(x, Lp)
 	pos_y = gamma(y, Lp)
 	pos_z = gamma(z, Lp)
-	pos_d1 = gamma(torch.sin(theta)*torch.cos(phi), Ld)
-	pos_d2 = gamma(torch.sin(theta)*torch.sin(phi), Ld)
-	pos_d3 = gamma(torch.cos(theta), Ld)
+	pos_d1 = gamma(d1, Ld)
+	pos_d2 = gamma(d2, Ld)
+	pos_d3 = gamma(d3, Ld)
 
 	posx = torch.cat([pos_x, pos_y, pos_z], axis=1)
 	posd = torch.cat([pos_d1, pos_d2, pos_d3], axis=1)
 
 	return posx, posd
 
+def rays_single_cam(cam_params):
+	""" takes in camera params H,W,f returns H*W ray directions with origin 0,0,0
+	Args:
+		cam_params (list): [H, W, f]
+	Returns:
+		rays (torch Tensor): 3 x HW
+	"""
+	H , W, f  = cam_params
+	Hl = torch.arange(H) - H//2
+	Wl = torch.arange(W) - W//2
+	grid_x, grid_y = torch.meshgrid(Hl, Wl)
+	rays = torch.stack((grid_x, grid_y, f*torch.ones_like(grid_x))).float()
+	rays = rays / torch.norm(rays, dim=0)
+	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800), normalized
+	return rays
+
 def gen_poses_animation():
 	""" generates a list of poses for rendering, to make video animation """
-
+	pass

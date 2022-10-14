@@ -4,7 +4,9 @@ import glob
 import json
 import cv2
 import re 
+import torch
 from natsort import natsort_keygen, ns
+from utils.xyz import rays_single_cam
 
 
 def load_data(path):
@@ -58,17 +60,17 @@ def load_data(path):
 	train_samples = []
 	for i in range(num_train):
 		train_img = cv2.cvtColor(cv2.imread(train_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
-		transform = train_transform['frames'][i]
-		transform['transform_matrix'] = np.array(transform['transform_matrix'])
-		train_samples.append({'img': train_img, 'transform':transform})
+		metadata = train_transform['frames'][i]
+		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
+		train_samples.append({'img': train_img, 'transform':transform, 'metadata':metadata})
 
 	## generate val samples 
 	val_samples = [] 
 	for i in range(num_val):
 		val_img = cv2.cvtColor(cv2.imread(val_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
-		transform = val_transform['frames'][i]
-		transform['transform_matrix'] = np.array(transform['transform_matrix'])
-		val_samples.append({'img': val_img, 'transform':transform})
+		metadata = val_transform['frames'][i]
+		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
+		val_samples.append({'img': val_img, 'transform':transform, 'metadata':metadata})
 	
 
 	test_samples = [] 
@@ -76,9 +78,9 @@ def load_data(path):
 		img = cv2.cvtColor(cv2.imread(test_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		img_depth = cv2.cvtColor(cv2.imread(test_depth_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		img_normal = cv2.cvtColor(cv2.imread(test_normal_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
-		transform = test_transform['frames'][i]
-		transform['transform_matrix'] = np.array(transform['transform_matrix'])
-		test_samples.append({'img': img, 'img_depth': img_depth, 'img_normal':img_normal, 'transform':transform})	
+		metadata = test_transform['frames'][i]
+		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
+		test_samples.append({'img': img, 'img_depth': img_depth, 'img_normal':img_normal, 'transform':transform, 'metadata':metadata})	
 
 	## calculate image params and focal length 
 	fov = train_transform['camera_angle_x']
@@ -93,6 +95,50 @@ def load_data(path):
 	samples['val'] = val_samples
 	return samples, cam_params   
 
+def rays_dataset(samples, cam_params):
+	""" Generates rays and camera origins for train test and val sets under diff camera poses""" 
+	keys = ['train', 'test', 'val']
+	rays_1_cam = rays_single_cam(cam_params)
+	rays = {}
+	cam_origins = {}
+	H, W, f = cam_params
+	for k in keys:
+		num_images = len(samples[k])
+		transf_mats = torch.stack([s['transform'] for s in samples[k]])
+		rays_dataset =  torch.matmul(transf_mats[:,:3,:3], rays_1_cam)
+		cam_origins = transf_mats[:,:3,3:]
+		cam_origins = cam_origins.expand(num_images,3,H*W) #Bx3xHW
+		rays[k] = torch.cat((cam_origins, rays_dataset),dim=1).permute(1,0,2).reshape(6,-1) # 6xBHW, number of cameras 
+
+	return rays
+
+class RayGenerator:
+	def __init__(self, path, on_gpu=False):
+		samples, cam_params = load_data(path)
+		self.samples = samples
+		self.cam_params = cam_params
+		self.H = cam_params[0]
+		self.W = cam_params[1]
+		self.f = cam_params[2]
+		self.rays_dataset = rays_dataset(self.samples, cam_params)
+
+	def select(self, mode='train', N=4096):
+		""" randomly selects N train/test/val rays
+		Args:
+			mode: 'train', 'test', 'val'
+			N: number of rays to sample 
+		Returns:
+			rays (torch Tensor): Nx6 
+			ray_ids: Nx1 
+		"""
+		data = self.rays_dataset[mode]
+		samples = self.samples[mode]
+		ray_ids = torch.randint(0, data.size(1), (N,))
+		rays = data[:,ray_ids].transpose(1,0)
+		return rays, ray_ids 
+
+		
+		
 
 
-	
+
