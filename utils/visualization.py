@@ -3,8 +3,6 @@ import numpy as np
 import torch
 import os 
 
-
-
 def polar_to_mat(theta,phi,r):
 	""" use r, theta phi to generate transformation matrix for generating pose of camera w.r.t world """
 	pass

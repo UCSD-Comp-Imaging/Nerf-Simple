@@ -9,7 +9,7 @@ from natsort import natsort_keygen, ns
 from utils.xyz import rays_single_cam
 
 
-def load_data(path):
+def load_data(path, half_res=True):
 	"""
 	Assume path has the following structure - 
 	path/ -
@@ -62,6 +62,9 @@ def load_data(path):
 		train_img = cv2.cvtColor(cv2.imread(train_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = train_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
+		if half_res:
+			H,W = train_img.shape[:2]
+			train_img = cv2.resize(train_img, (W//2 , H//2 ), interpolation=cv2.INTER_AREA)
 		train_samples.append({'img': train_img, 'transform':transform, 'metadata':metadata})
 
 	## generate val samples 
@@ -70,6 +73,10 @@ def load_data(path):
 		val_img = cv2.cvtColor(cv2.imread(val_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = val_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
+		if half_res:
+			H,W = val_img.shape[:2]
+			val_img = cv2.resize(val_img, (W//2, H//2), interpolation=cv2.INTER_AREA)
+
 		val_samples.append({'img': val_img, 'transform':transform, 'metadata':metadata})
 	
 
@@ -80,7 +87,12 @@ def load_data(path):
 		img_normal = cv2.cvtColor(cv2.imread(test_normal_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = test_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
-		test_samples.append({'img': img, 'img_depth': img_depth, 'img_normal':img_normal, 'transform':transform, 'metadata':metadata})	
+		if half_res:
+			H,W = img.shape[:2]
+			img = cv2.resize(img, (W//2 ,H//2), interpolation=cv2.INTER_AREA)
+
+		test_samples.append({'img': img, 'img_depth': img_depth, 'img_normal':img_normal,\
+			 				 'transform':transform, 'metadata':metadata})	
 
 	## calculate image params and focal length 
 	fov = train_transform['camera_angle_x']
@@ -113,8 +125,8 @@ def rays_dataset(samples, cam_params):
 	return rays
 
 class RayGenerator:
-	def __init__(self, path, on_gpu=False):
-		samples, cam_params = load_data(path)
+	def __init__(self, path, half_res=True, on_gpu=False):
+		samples, cam_params = load_data(path, half_res)
 		self.samples = samples
 		self.cam_params = cam_params
 		self.H = cam_params[0]
@@ -135,7 +147,27 @@ class RayGenerator:
 		samples = self.samples[mode]
 		ray_ids = torch.randint(0, data.size(1), (N,))
 		rays = data[:,ray_ids].transpose(1,0)
-		return rays, ray_ids 
+		return rays, ray_ids
+
+	def select_imgs(self, mode='train', N=4096, im_idxs=[0,1,2]):
+		""" randomly selects N train/test/val rays from a given image
+		Args:
+			mode: 'train', 'test', 'val'
+			N: number of rays to sample
+			im_idxs: which image to select
+		Returns:
+			rays (torch Tensor): Nx6 
+			ray_ids: Nx1 
+		"""
+		data = []
+		for im_idx in im_idxs:
+			data.append(self.rays_dataset[mode][:,im_idx*640000:(im_idx + 1)*640000])
+		data = torch.cat(data, dim=1)	
+		samples = self.samples[mode]
+		ray_ids = torch.randint(0, data.size(1), (N,))
+		rays = data[:,ray_ids].transpose(1,0)
+		return rays, ray_ids
+
 
 		
 		

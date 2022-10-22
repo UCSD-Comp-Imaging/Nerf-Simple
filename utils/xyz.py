@@ -9,7 +9,7 @@ def gamma(x, L=4):
 		warnings.warn("input not in range -1,1, check rescaling")
 	vec = []
 	for i in range(L):
-		vec += [torch.sin(2**i * np.pi * x), torch.cos(2**i * np.pi * x)]
+		vec += [torch.sin(2**i * x), torch.cos(2**i * x)]
 	vec = torch.cat(vec, axis=1)
 	return vec
 
@@ -30,8 +30,8 @@ def positional_encoder(vec, Lp=10, Ld=4):
 	pos_d2 = gamma(d2, Ld)
 	pos_d3 = gamma(d3, Ld)
 
-	posx = torch.cat([pos_x, pos_y, pos_z], axis=1)
-	posd = torch.cat([pos_d1, pos_d2, pos_d3], axis=1)
+	posx = torch.cat([x, y, z, pos_x, pos_y, pos_z], axis=1)
+	posd = torch.cat([d1, d2, d3, pos_d1, pos_d2, pos_d3], axis=1)
 
 	return posx, posd
 
