@@ -145,7 +145,8 @@ class RayGenerator:
 		"""
 		data = self.rays_dataset[mode]
 		samples = self.samples[mode]
-		ray_ids = torch.randint(0, data.size(1), (N,))
+		ray_ids = np.random.choice(data.size(1), (N,), replace=False)
+		# ray_ids = torch.randint(0, data.size(1), (N,))
 		rays = data[:,ray_ids].transpose(1,0)
 		return rays, ray_ids
 
@@ -159,13 +160,21 @@ class RayGenerator:
 			rays (torch Tensor): Nx6 
 			ray_ids: Nx1 
 		"""
+		NUM_RAYS = self.H * self.W
 		data = []
+		rays_idxs = [] 
 		for im_idx in im_idxs:
-			data.append(self.rays_dataset[mode][:,im_idx*640000:(im_idx + 1)*640000])
+			data.append(self.rays_dataset[mode][:,im_idx*NUM_RAYS:(im_idx + 1)*NUM_RAYS])
+			rays_idxs.append(np.arange(im_idx*NUM_RAYS, (im_idx + 1)*NUM_RAYS))
 		data = torch.cat(data, dim=1)	
+
 		samples = self.samples[mode]
-		ray_ids = torch.randint(0, data.size(1), (N,))
-		rays = data[:,ray_ids].transpose(1,0)
+		select_ids = np.random.choice(data.size(1), (N,), replace=False)
+		rays_idxs = np.concatenate(rays_idxs)
+		# ray_ids = torch.randint(0, data.size(1), (N,))
+		rays = data[:,select_ids].transpose(1,0)
+		ray_ids = rays_idxs[select_ids]
+
 		return rays, ray_ids
 
 

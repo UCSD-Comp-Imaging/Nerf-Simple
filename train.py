@@ -39,14 +39,14 @@ def train(params):
 	lr_end = params['lr_final']
 	decay = np.exp(np.log(lr_end / lr_start) / params['num_iters'])
 	
-	net = Nerf().cuda()
+	# net_ref = Nerf().cuda()
 	net_ref = NerfRef(input_ch=63, input_ch_views=27).cuda()
 	criterion = nn.MSELoss()
 	optimizer = torch.optim.Adam(net_ref.parameters(), lr=5e-4)
 	## TODO: Add code to load state dict from pre-trained model
 	for i in tqdm(range(params['num_iters'])):
 		# rays, ray_ids = rg.select(mode='train', N=batch_size)
-		rays, ray_ids = rg.select_imgs(mode='train', N=batch_size, im_idxs=[2])
+		rays, ray_ids = rg.select_imgs(mode='train', N=batch_size, im_idxs=[5])
 		gt_colors = train_imgs[ray_ids,:].float().cuda()
 		optimizer.zero_grad()
 		# rgb, depth, alpha, acc, w = render_nerf(rays.cuda(), net, params['Nf'])
@@ -59,7 +59,7 @@ def train(params):
 			print(f'loss: {loss.item()} | epoch: {i+1} ')
 		if i % params['ckpt_images'] == 0:
 			print("--- rendering image ---")
-			for ii in [2]:
+			for ii in [5]:
 				rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
 														im_idx=ii, im_set='train', nerf_type='ref')
 				writer.add_images(f'train/RGB_{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
@@ -68,13 +68,13 @@ def train(params):
 				writer.add_scalar(f"Loss/Train_Img_MSE_{ii}", img_mse(gt_img, rgb_img), i+1)
 				writer.add_scalar(f"Loss/Train_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
 
-				rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
-														im_idx=ii, im_set='val', nerf_type='ref')
-				writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
-				writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
-				writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')
-				writer.add_scalar(f"Loss/Val_Img_MSE{ii}", img_mse(gt_img, rgb_img), i+1)
-				writer.add_scalar(f"Loss/Val_Img_PSNRf{ii}", img_psnr(gt_img, rgb_img), i+1)
+				# rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
+				# 										im_idx=ii, im_set='val', nerf_type='ref')
+				# writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
+				# writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
+				# writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')
+				# writer.add_scalar(f"Loss/Val_Img_MSE{ii}", img_mse(gt_img, rgb_img), i+1)
+				# writer.add_scalar(f"Loss/Val_Img_PSNRf{ii}", img_psnr(gt_img, rgb_img), i+1)
 
 		if i% params['ckpt_model'] == 0:
 			print("saving model")

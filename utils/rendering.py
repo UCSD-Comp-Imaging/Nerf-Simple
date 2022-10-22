@@ -33,7 +33,7 @@ def render_nerf(rays, net, N, tn=2, tf=6, gpu=True, mode='Train'):
 	
 	## TODO how to rescale coordinates to -1,1 
 	locs = origins.unsqueeze(-1) + disp # Bx3x1 + Bx3xN = Bx3xN 
-	
+	dirs = dirs / torch.norm(dirs, dim=1, keepdim=True)	
 	query_pts = torch.cat((locs, dirs.unsqueeze(-1).expand(-1,-1,N)),dim=1) # Bx6xN
 	query_pts = query_pts.permute(0,2,1) # BxNx6
 	query_pts = query_pts.reshape(-1,6)
@@ -42,9 +42,7 @@ def render_nerf(rays, net, N, tn=2, tf=6, gpu=True, mode='Train'):
 	rgb, depth, alpha, acc, w = raw2outputs(out, ts, dirs)
 	rgb_v, depth_v, alpha_v, acc_v, w_v = volume_render(out, ts, dirs, mode=mode)
 
-	# import pdb 
-	# pdb.set_trace()
-	return rgb, depth, alpha, acc, w
+	return rgb_v, depth_v, alpha_v, acc_v, w_v
 
 def render_nerf_ref(rays, net, N, tn=2, tf=6, gpu=True, mode='Train'):
 	""" stratified sampling on a set of rays using Nerf model
@@ -165,6 +163,7 @@ def volume_render(nerf_outs, ts, dirs, mode='Train'):
 	# weights = alpha*T 
 	
 	## accumulated rgb color along each ray (Bx3)
+	# rgb = torch.sigmoid(nerf_outs[...,:3])
 	rgb = torch.sum(weights.unsqueeze(-1)*nerf_outs[...,:3], axis=1)
 	## depth along each ray (B,), weighted average of samples 
 	depth = torch.sum(weights * ts, axis=-1)
@@ -181,6 +180,7 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', nerf_type='r
 
 	gt_img = rg.samples[im_set][im_idx]['img']
 	H,W = gt_img.shape[0], gt_img.shape[1]
+	
 	NUM_RAYS = H*W # number of rays in image, currently hardcoded
 	net = net.cuda()
 	rays = rg.rays_dataset[im_set][:,im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS].transpose(1,0)
