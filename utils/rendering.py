@@ -83,9 +83,8 @@ def render_nerf_ref(rays, net, N, tn=2, tf=6, gpu=True, mode='Train'):
 	rgb, depth, alpha, acc, w = raw2outputs(out, ts, dirs)
 	rgb_v, depth_v, alpha_v, acc_v, w_v = volume_render(out, ts, dirs, mode=mode)
 
-	# import pdb 
-	# pdb.set_trace()
-	return rgb_v, depth_v, alpha_v, acc_v, w_v
+	return rgb, depth, alpha, acc, w
+	# return rgb_v, depth_v, alpha_v, acc_v, w_v
 
 def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0.0, white_bkgd=False, pytest=False):
     """Transforms model's predictions to semantically meaningful values.
@@ -180,7 +179,7 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', nerf_type='r
 
 	gt_img = rg.samples[im_set][im_idx]['img']
 	H,W = gt_img.shape[0], gt_img.shape[1]
-	
+
 	NUM_RAYS = H*W # number of rays in image, currently hardcoded
 	net = net.cuda()
 	rays = rg.rays_dataset[im_set][:,im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS].transpose(1,0)

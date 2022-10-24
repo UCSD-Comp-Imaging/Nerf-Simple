@@ -46,8 +46,9 @@ def rays_single_cam(cam_params):
 	Hl = torch.arange(H) - H//2
 	Wl = torch.arange(W) - W//2
 	grid_x, grid_y = torch.meshgrid(Wl, Hl)
-	rays = torch.stack((grid_x/f, grid_y/f, -1*torch.ones_like(grid_x))).float()
+	rays = torch.stack((grid_x/f, -grid_y/f, -1*torch.ones_like(grid_x))).float()
 	# rays = rays / torch.norm(rays, dim=0)
+	rays = rays.permute(0,2,1)
 	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800), normalized
 	return rays
 

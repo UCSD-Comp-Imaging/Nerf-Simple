@@ -68,13 +68,13 @@ def train(params):
 				writer.add_scalar(f"Loss/Train_Img_MSE_{ii}", img_mse(gt_img, rgb_img), i+1)
 				writer.add_scalar(f"Loss/Train_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
 
-				# rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
-				# 										im_idx=ii, im_set='val', nerf_type='ref')
-				# writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
-				# writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
-				# writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')
-				# writer.add_scalar(f"Loss/Val_Img_MSE{ii}", img_mse(gt_img, rgb_img), i+1)
-				# writer.add_scalar(f"Loss/Val_Img_PSNRf{ii}", img_psnr(gt_img, rgb_img), i+1)
+				rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
+														im_idx=ii, im_set='val', nerf_type='ref')
+				writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
+				writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
+				writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')
+				writer.add_scalar(f"Loss/Val_Img_MSE{ii}", img_mse(gt_img, rgb_img), i+1)
+				writer.add_scalar(f"Loss/Val_Img_PSNRf{ii}", img_psnr(gt_img, rgb_img), i+1)
 
 		if i% params['ckpt_model'] == 0:
 			print("saving model")
