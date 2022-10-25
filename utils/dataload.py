@@ -9,7 +9,7 @@ from natsort import natsort_keygen, ns
 from utils.xyz import rays_single_cam
 
 
-def load_data(path, half_res=True):
+def load_data(path, half_res=True, num_imgs=-1):
 	"""
 	Assume path has the following structure - 
 	path/ -
@@ -52,9 +52,13 @@ def load_data(path, half_res=True):
 	with open(os.path.join(path, 'transforms_val.json')) as f:
 		val_transform = json.load(f)
 
-	num_train = len(train_img_paths)
-	num_val = len(val_img_paths)
-	num_test = len(test_img_paths)
+	if num_imgs < 0:
+		num_train = len(train_img_paths)
+		num_val = len(val_img_paths)
+		num_test = len(test_img_paths)
+	else:
+
+		num_train = num_val = num_test = num_imgs
 
 	## generate training samples 
 	train_samples = []
@@ -120,13 +124,13 @@ def rays_dataset(samples, cam_params):
 		rays_dataset =  torch.matmul(transf_mats[:,:3,:3], rays_1_cam)
 		cam_origins = transf_mats[:,:3,3:]
 		cam_origins = cam_origins.expand(num_images,3,H*W) #Bx3xHW
-		rays[k] = torch.cat((cam_origins, rays_dataset),dim=1).permute(1,0,2).reshape(6,-1) # 6xBHW, number of cameras 
+		rays[k] = torch.cat((cam_origins, rays_dataset),dim=1).permute(0,2,1).reshape(-1, 6) # BHW x 6, number of cameras 
 
 	return rays
 
 class RayGenerator:
-	def __init__(self, path, half_res=True, on_gpu=False):
-		samples, cam_params = load_data(path, half_res)
+	def __init__(self, path, half_res=True, num_imgs=-1):
+		samples, cam_params = load_data(path, half_res, num_imgs)
 		self.samples = samples
 		self.cam_params = cam_params
 		self.H = cam_params[0]
@@ -144,11 +148,11 @@ class RayGenerator:
 			ray_ids: Nx1 
 		"""
 		data = self.rays_dataset[mode]
-		samples = self.samples[mode]
 		# ray_ids = np.random.choice(data.size(1), (N,), replace=False)
-		ray_ids = torch.randperm(data.size(1))[:N]
+		ray_ids = torch.randperm(data.size(0))[:N]
 		# ray_ids = torch.randint(0, data.size(1), (N,))
-		rays = data[:,ray_ids].transpose(1,0)
+		# rays = data[:,ray_ids].transpose(1,0)
+		rays = data[ray_ids,:]
 		return rays, ray_ids
 
 	def select_imgs(self, mode='train', N=4096, im_idxs=[0,1,2]):
@@ -165,15 +169,16 @@ class RayGenerator:
 		data = []
 		rays_idxs = [] 
 		for im_idx in im_idxs:
-			data.append(self.rays_dataset[mode][:,im_idx*NUM_RAYS:(im_idx + 1)*NUM_RAYS])
+			data.append(self.rays_dataset[mode][im_idx*NUM_RAYS:(im_idx + 1)*NUM_RAYS,:])
 			rays_idxs.append(np.arange(im_idx*NUM_RAYS, (im_idx + 1)*NUM_RAYS))
-		data = torch.cat(data, dim=1)	
+		data = torch.cat(data, dim=0)	
 
 		samples = self.samples[mode]
-		select_ids = np.random.choice(data.size(1), (N,), replace=False)
+		select_ids = np.random.choice(data.size(0), (N,), replace=False)
 		rays_idxs = np.concatenate(rays_idxs)
 		# ray_ids = torch.randint(0, data.size(1), (N,))
-		rays = data[:,select_ids].transpose(1,0)
+		# rays = data[:,select_ids].transpose(1,0)
+		rays = data[select_ids, :]
 		ray_ids = rays_idxs[select_ids]
 
 		return rays, ray_ids

@@ -30,7 +30,7 @@ def train(params):
 		os.makedirs(os.path.join(params['savepath'], params['exp_name']))
 	writer = SummaryWriter('logs/run_{}/'.format(str(time.time())[-10:]))
 	batch_size = params['batch_size']
-	rg = RayGenerator(params['datapath'], params['half_res'])
+	rg = RayGenerator(params['datapath'], params['half_res'], 25)
 	train_imgs = torch.stack([torch.from_numpy(s['img']) for s in rg.samples['train']]).reshape(-1,3)
 	# val_imgs = torch.stack([torch.from_numpy(s['img']) for s in rg.samples['val']]).reshape(-1,3)
 
@@ -39,18 +39,19 @@ def train(params):
 	lr_end = params['lr_final']
 	decay = np.exp(np.log(lr_end / lr_start) / params['num_iters'])
 	
-	# net_ref = Nerf().cuda()
-	net_ref = NerfRef(input_ch=63, input_ch_views=27).cuda()
+	net_ref = Nerf().cuda()
+	# net_ref = NerfRef(input_ch=63, input_ch_views=27).cuda()
 	criterion = nn.MSELoss()
 	optimizer = torch.optim.Adam(net_ref.parameters(), lr=5e-4)
 	## TODO: Add code to load state dict from pre-trained model
 	for i in tqdm(range(params['num_iters'])):
-		# rays, ray_ids = rg.select(mode='train', N=batch_size)
-		rays, ray_ids = rg.select_imgs(mode='train', N=batch_size, im_idxs=[5])
+		rays, ray_ids = rg.select(mode='train', N=batch_size)
+		# rays, ray_ids = rg.select_imgs(mode='train', N=batch_size, im_idxs=[0])
 		gt_colors = train_imgs[ray_ids,:].float().cuda()
 		optimizer.zero_grad()
 		# rgb, depth, alpha, acc, w = render_nerf(rays.cuda(), net, params['Nf'])
-		rgb_ref, depth_ref, alpha_ref, acc_ref, w_ref = render_nerf_ref(rays.cuda(), net_ref, params['Nf'])
+		rgb_ref, depth_ref, alpha_ref, acc_ref, w_ref = render_nerf(rays.cuda(), net_ref, params['Nf'])
+		# rgb_ref, depth_ref, alpha_ref, acc_ref, w_ref = render_nerf_ref(rays.cuda(), net_ref, params['Nf'])
 		# loss = criterion(rgb, gt_colors) + 
 		loss = criterion(rgb_ref, gt_colors)
 		if i % params['ckpt_loss'] == 0:
@@ -59,9 +60,9 @@ def train(params):
 			print(f'loss: {loss.item()} | epoch: {i+1} ')
 		if i % params['ckpt_images'] == 0:
 			print("--- rendering image ---")
-			for ii in [5]:
+			for ii in [0]:
 				rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
-														im_idx=ii, im_set='train', nerf_type='ref')
+														im_idx=ii, im_set='train', nerf_type='no_ref')
 				writer.add_images(f'train/RGB_{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'train/Depth_{ii}', depth_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'train/GT_{ii}', gt_img, global_step=i+1, dataformats='NHWC')
@@ -69,7 +70,7 @@ def train(params):
 				writer.add_scalar(f"Loss/Train_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
 
 				rgb_img, depth_img, gt_img = render_image(net_ref, rg, batch_size=16000,\
-														im_idx=ii, im_set='val', nerf_type='ref')
+														im_idx=ii, im_set='val', nerf_type='no_ref')
 				writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')

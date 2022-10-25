@@ -1,1 +1,3 @@
 natsort
+plotly 
+visu3d 

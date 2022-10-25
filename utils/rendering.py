@@ -39,7 +39,7 @@ def render_nerf(rays, net, N, tn=2, tf=6, gpu=True, mode='Train'):
 	query_pts = query_pts.reshape(-1,6)
 	out = net.forward(query_pts)
 	out = out.reshape(B,N,4)
-	rgb, depth, alpha, acc, w = raw2outputs(out, ts, dirs)
+	# rgb, depth, alpha, acc, w = raw2outputs(out, ts, dirs)
 	rgb_v, depth_v, alpha_v, acc_v, w_v = volume_render(out, ts, dirs, mode=mode)
 
 	return rgb_v, depth_v, alpha_v, acc_v, w_v
@@ -169,9 +169,12 @@ def volume_render(nerf_outs, ts, dirs, mode='Train'):
 
 	## accumulation map (B,): average of weight values along a ray 
 	acc = torch.sum(weights, axis=-1)
-	# rgb += 1-acc.unsqueeze(-1)
-	# print(acc)
-	return rgb, depth, alpha, acc, weights
+	
+	## computing disparity from depth 
+	disp = torch.max(1e-10 * torch.ones_like(depth), depth / torch.sum(weights, dim=-1))
+	disp = 1. / disp
+
+	return rgb, disp, alpha, acc, weights
 
 
 def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', nerf_type='ref'):
@@ -182,8 +185,8 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', nerf_type='r
 
 	NUM_RAYS = H*W # number of rays in image, currently hardcoded
 	net = net.cuda()
-	rays = rg.rays_dataset[im_set][:,im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS].transpose(1,0)
-	# rays = rg.rays_dataset[im_set][im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS,:]
+	# rays = rg.rays_dataset[im_set][:,im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS].transpose(1,0)
+	rays = rg.rays_dataset[im_set][im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS,:]
 	rgbs = [] 
 	depths = [] 
 	with torch.no_grad():
