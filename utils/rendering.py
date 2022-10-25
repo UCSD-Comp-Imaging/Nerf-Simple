@@ -207,3 +207,5 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', nerf_type='r
 	depth_img = depth.reshape(1,H,W,1) ## permuting for tensorboard
 	gt_img = gt_img.reshape(1,H,W,3)
 	return rgb_img, depth_img, gt_img
+
+	
