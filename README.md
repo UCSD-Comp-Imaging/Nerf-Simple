@@ -5,7 +5,7 @@ This is a simplified implementation of NeRF, without hierarchical sampling. The 
 
 
 
-https://user-images.githubusercontent.com/114626135/197913739-df9d9673-7533-4e82-ab4e-855d6f28db70.mp4
+![Sample Video](https://user-images.githubusercontent.com/114626135/197913739-df9d9673-7533-4e82-ab4e-855d6f28db70.mp4)
 
 NeRF trained on 25 images, for 10000 iterations (takes around 30 min). 
 
