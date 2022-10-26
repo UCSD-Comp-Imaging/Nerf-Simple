@@ -47,11 +47,45 @@ def rays_single_cam(cam_params):
 	Wl = torch.arange(W) - W//2
 	grid_x, grid_y = torch.meshgrid(Wl, Hl)
 	rays = torch.stack((grid_x/f, -grid_y/f, -1*torch.ones_like(grid_x))).float()
-	# rays = rays / torch.norm(rays, dim=0)
 	rays = rays.permute(0,2,1)
-	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800), normalized
+	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800)
 	return rays
 
-def gen_poses_animation():
-	""" generates a list of poses for rendering, to make video animation """
-	pass
+
+def polar_to_mat(theta):
+	""" use r, theta phi to generate transformation matrix for generating pose of camera w.r.t world """
+	theta_mat = np.array([[1., 0., 0., 0.],
+						  [0., np.cos(theta), np.sin(theta), 0.],
+						  [0., -np.sin(theta), np.cos(theta), 0.],
+						  [0., 0., 0., 1.]])
+	return theta_mat 
+
+def phi_to_mat(phi):
+	mat = np.array([[np.cos(phi), np.sin(phi), 0., 0.],
+					[-np.sin(phi), np.cos(phi), 0., 0.],
+					[0., 0., 1., 0],
+					[0., 0., 0., 1. ]])
+	return mat 
+
+def spherical_to_pose(r, theta, phi):
+	""" returns pose corresponding to the input spherical coordinates r, theta, phi of the camera """
+	theta = np.radians(theta)
+	phi = np.radians(phi)
+	trans_mat = np.array([[1., 0., 0., 0.],
+						  [0., 1., 0., 0.],
+						  [0., 0., 1., r],
+						  [0., 0., 0., 1.]])
+	theta_mat = polar_to_mat(theta)
+	phi_mat = phi_to_mat(phi)
+	pose = phi_mat@theta_mat@trans_mat
+	return pose
+
+def poses_to_render(r, theta, n_phi=40):
+	""" list of cam poses (torch.Tensor) at radisus r, altitude theta and n_phi continuous azimuths
+	Args:
+		r: camera distance from origin 
+		theta (degrees): altitude of camera (zenith)
+	"""
+	phis = np.linspace(0, 360.0, n_phi)
+	poses = [torch.from_numpy(spherical_to_pose(r, theta, phi)).float() for phi in phis]
+	return poses

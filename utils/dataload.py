@@ -148,10 +148,7 @@ class RayGenerator:
 			ray_ids: Nx1 
 		"""
 		data = self.rays_dataset[mode]
-		# ray_ids = np.random.choice(data.size(1), (N,), replace=False)
 		ray_ids = torch.randperm(data.size(0))[:N]
-		# ray_ids = torch.randint(0, data.size(1), (N,))
-		# rays = data[:,ray_ids].transpose(1,0)
 		rays = data[ray_ids,:]
 		return rays, ray_ids
 
@@ -176,8 +173,6 @@ class RayGenerator:
 		samples = self.samples[mode]
 		select_ids = np.random.choice(data.size(0), (N,), replace=False)
 		rays_idxs = np.concatenate(rays_idxs)
-		# ray_ids = torch.randint(0, data.size(1), (N,))
-		# rays = data[:,select_ids].transpose(1,0)
 		rays = data[select_ids, :]
 		ray_ids = rays_idxs[select_ids]
 

@@ -7,25 +7,13 @@ import numpy as np
 from utils.dataload import load_data, RayGenerator
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image, make_grid
-from utils.nets import Nerf, NerfRef
+from utils.nets import Nerf
 from utils.xyz import * 
 from utils.rendering import *
-from utils.visualization import render_poses, poses_to_render
+# from utils.visualization import render_poses, poses_to_render
 import argparse 
 import yaml 
 from tqdm import tqdm 
-
-def img_mse(gt, pred):
-	if not torch.is_tensor(gt):
-		gt = torch.from_numpy(gt).float()
-	return torch.mean((pred - gt)**2)
-
-def img_psnr(gt, pred):
-	ten = torch.tensor(10)
-	if not torch.is_tensor(gt):
-		gt = torch.from_numpy(gt).float()
-	psnr = 20*torch.log(torch.max(gt))/torch.log(ten) - 10 * torch.log(img_mse(gt, pred))/torch.log(ten)
-	return psnr 
 
 def test(params):
 	assert os.path.exists(params['loadpath']), "model path doesn't exist"
@@ -34,14 +22,15 @@ def test(params):
 	
 	savepath = os.path.join(params['savepath'], params['exp_name'])
 	batch_size = params['batch_size']
-	# net = NerfRef(input_ch=63, input_ch_views=27).cuda()
 	rg = RayGenerator(params['datapath'], params['half_res'])
 	cam_params = [rg.H, rg.W, rg.f]
 	net = Nerf().cuda()
 	net.load_state_dict(torch.load(params['loadpath']),strict=True)
 	
 	if params['animation']:
-		poses = poses_to_render(r=4, theta=0, n_phi=10)
+		theta = -params['theta']
+		n_phi = params['num_poses']
+		poses = poses_to_render(r=4, theta=theta, n_phi=n_phi)
 		render_poses(net, poses, cam_params, batch_size, savepath)
 		return
 
