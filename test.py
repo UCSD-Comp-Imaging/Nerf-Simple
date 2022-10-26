@@ -39,7 +39,7 @@ def test(params):
 	with torch.no_grad():
 		for idx in params['im_idxs']:
 			rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=params['batch_size'],\
-											 		  im_idx=idx, im_set=im_set, nerf_type='no_ref')
+											 		  im_idx=idx, im_set=im_set)
 			rgb_out = torch.cat((torch.from_numpy(gt_img), rgb_img),axis=0)
 			save_image(make_grid(rgb_out.permute(0,3,1,2)), os.path.join(params['savepath'], params['exp_name'], f'rgb_{idx}.png'))
 			save_image(make_grid(depth_img.permute(0,3,1,2)), os.path.join(params['savepath'], params['exp_name'], f'depth_{idx}.png'))
