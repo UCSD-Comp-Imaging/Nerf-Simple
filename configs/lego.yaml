@@ -22,8 +22,8 @@ test_params:
   savepath: /home/ubuntu/NeRF_CT/results/lego
   exp_name: mynerf_25_imgs
   im_set: test 
-  im_idxs: [0,1,2,3,4,5,50,55,56,57,58,59] # renders rgb and depth for these indices from im_set
-  animation: True # if True, only renders video 
+  im_idxs: [0,5,50,58,65] # renders rgb and depth for these indices from im_set
+  animation: False # if True, only renders video 
   num_poses: 30
   theta: 30
   
