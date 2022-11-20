@@ -1,0 +1,42 @@
+datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
+savepath: /home/ubuntu/NeRF_CT/models/ 
+exp_name: LargeScale
+lr_init: 0.0005
+lr_final: 0.00005
+Nf: 128
+Nc: 64 # coarse and fine is not implemented yet
+tn: 2
+tf: 6 
+num_iters: 4000
+ckpt_model: 2000
+ckpt_loss: 100
+ckpt_images: 500
+batch_size: 4096
+half_res: True 
+val_idxs: [0,1]
+num_train_imgs: -1 # -1 to use all images in the train set
+
+test_params:
+  batch_size: 16000
+  half_res: True 
+  loadpath: /home/ubuntu/NeRF_CT/models/Three_Images/1666742866.6157136.pth
+  datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
+  savepath: /home/ubuntu/NeRF_CT/results/lego
+  exp_name: mynerf_phase_optic_64_1.5
+  im_set: test 
+  im_idxs: [0,5,50,58,65] # renders rgb and depth for these indices from im_set
+  animation: False # if True, only renders video 
+  num_poses: 30
+  theta: 30
+  phase_optic:
+    use_phase_optic: True
+    type: uniform 
+    num_lenses: 64
+    radius: auto
+    radius_scale: 1.5
+    Nf: 128
+    Nc: 64 # coarse and fine is not implemented yet
+    tn: 0.5
+    tf: 6
+
+  

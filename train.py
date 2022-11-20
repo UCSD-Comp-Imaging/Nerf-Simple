@@ -48,7 +48,7 @@ def train(params):
 		# rays, ray_ids = rg.select_imgs(mode='train', N=batch_size, im_idxs=[0])
 		gt_colors = train_imgs[ray_ids,:].float().cuda()
 		optimizer.zero_grad()
-		rgb, depth, alpha, acc, w = render_nerf(rays.cuda(), net, params['Nf'])
+		rgb, depth, alpha, acc, w = render_nerf(rays.cuda(), net, params['Nf'], params['tn'], params['tf'])
 		loss = criterion(rgb, gt_colors)
 		
 		loss.backward()
@@ -66,7 +66,8 @@ def train(params):
 			print("--- rendering image ---")
 			for ii in params['val_idxs']:
 				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=16000,\
-														  im_idx=ii, im_set='train')
+														  im_idx=ii, im_set='train',\
+														  N=params['Nf'], tn=params['tn'], tf=params['tf'])
 				writer.add_images(f'train/RGB_{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'train/Depth_{ii}', depth_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'train/GT_{ii}', gt_img, global_step=i+1, dataformats='NHWC')
@@ -74,7 +75,8 @@ def train(params):
 				writer.add_scalar(f"Loss/Train_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
 
 				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=16000,\
-														  im_idx=ii, im_set='val')
+														  im_idx=ii, im_set='val',\
+														  N=params['Nf'], tn=params['tn'], tf=params['tf'])
 				writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
 				writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')

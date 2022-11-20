@@ -35,10 +35,11 @@ def positional_encoder(vec, Lp=10, Ld=4):
 
 	return posx, posd
 
-def rays_single_cam(cam_params):
+def rays_single_cam(cam_params, spp=1):
 	""" takes in camera params H,W,f returns H*W ray directions with origin 0,0,0
 	Args:
 		cam_params (list): [H, W, f]
+		spp (samples per pixel, int): if > 1 sample n samples randomly in each pixel
 	Returns:
 		rays (torch Tensor): 3 x HW
 	"""
@@ -50,7 +51,6 @@ def rays_single_cam(cam_params):
 	rays = rays.permute(0,2,1)
 	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800)
 	return rays
-
 
 def polar_to_mat(theta):
 	""" use r, theta phi to generate transformation matrix for generating pose of camera w.r.t world """

@@ -85,8 +85,13 @@ def volume_render(nerf_outs, ts, dirs):
 	return rgb, disp, alpha, acc, weights
 
 
-def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val'):
-	""" render an image and depth map from val set (currently hardcoded) from trained NeRF model """
+def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', N=128, tn=2, tf=6):
+	""" render an image and depth map from val set (currently hardcoded) from trained NeRF model
+	batch_size: batch size of rays 
+	N: number of samples per ray 
+	tn: lower limit of distance along ray 
+	tf: upper limit of distance along ray
+	"""
 
 	gt_img = rg.samples[im_set][im_idx]['img']
 	H,W = gt_img.shape[0], gt_img.shape[1]
@@ -99,7 +104,7 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val'):
 	with torch.no_grad():
 		for i in tqdm(range(rays.size(0) // batch_size)):
 			inp_rays = rays[i*batch_size:(i+1)*batch_size]
-			rgb, depth, _, _, _ = render_nerf(inp_rays.cuda(), net, N=128)
+			rgb, depth, _, _, _ = render_nerf(inp_rays.cuda(), net, N=N, tn=tn, tf=tf)
 			rgb = torch.clip(rgb, torch.tensor(0.).cuda(), torch.tensor(1.).cuda())
 			rgbs.append(rgb)
 			depths.append(depth)
@@ -113,12 +118,16 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val'):
 	return rgb_img, depth_img, gt_img
 
 
-def render_poses(net, poses, cam_params, batch_size, savepath=''):
+def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=None, N=128, tn=2, tf=6):
 	""" render an image and depth map from a given set of poses 
 	Args:
 		net: instance of Nerf() model loaded with params 
 		poses: list of 4x4 (np.array) camera poses in which scene is to be rendered
 		cam_params: [H, W, f]
+		batch_size: batch size of rays 
+		N: number of samples per ray 
+		tn: lower limit of distance along ray 
+		tf: upper limit of distance along ray
 	Returns:
 		An animation of poses 
 	"""
@@ -142,7 +151,7 @@ def render_poses(net, poses, cam_params, batch_size, savepath=''):
 			rays = rays_all[NUM_RAYS*idx:NUM_RAYS*(idx+1), :]
 			for i in tqdm(range(rays.size(0) // batch_size)):
 				inp_rays = rays[i*batch_size:(i+1)*batch_size]
-				rgb, depth, _, _, _ = render_nerf(inp_rays.cuda(), net, N=128)
+				rgb, depth, _, _, _ = render_nerf(inp_rays.cuda(), net, N=N, tn=tn, tf=tf)
 				rgb = torch.clip(rgb, torch.tensor(0.).cuda(), torch.tensor(1.).cuda())
 				rgbs.append(rgb)
 				depths.append(depth)

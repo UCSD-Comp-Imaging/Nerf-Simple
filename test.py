@@ -31,7 +31,8 @@ def test(params):
 		theta = -params['theta']
 		n_phi = params['num_poses']
 		poses = poses_to_render(r=4, theta=theta, n_phi=n_phi)
-		render_poses(net, poses, cam_params, batch_size, savepath)
+		render_poses(net, poses, cam_params, batch_size, savepath,\
+					N=params['Nf'], tn=params['tn'], tf=params['tf'])
 		return
 
 	im_set = params['im_set'] # can be 'train', 'test', 'val' depending on whcich images to render

@@ -4,6 +4,38 @@ import math
 from utils.xyz import rays_single_cam
 
 
+def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_range_percent: float, same_sag: bool):
+	""" return centers and radii of microlenslet in front of a sensor with 
+		random lens radii and lens centers. 
+	Args:
+		num_lenslets: Total number of lenslets on sensor plane (should be a square number)
+		cam_params: [H,W,f]
+		rscale: factor with which to scale radius
+		r_range_percent: percentage value between 0 and 1. randomly samples radii between B(1 +- radius_range).
+		B is base radius computed based on number of lenslets, and sensor size. 
+		same_sag (bool): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
+	Returns:
+		centers, radii 
+	"""
+	num = math.isqrt(num_lenslets)
+	H,W,f = cam_params 
+	h = H/f
+	w = W/f
+	base_radius = rscale*h / (2*num)
+	rlow = base_radius*(1 - r_range_percent)
+	rhigh = base_radius*(1 + r_range_percent)
+	radius_range = np.random.uniform(rlow, rhigh, size=num_lenslets)
+	ax, ay = np.meshgrid(np.linspace(-h/2,h/2,num), np.linspace(-w/2,w/2,num))
+	zs = -1*np.ones_like(ax) # assumed that all lenslets are on the image plane 
+
+	base_sag = base_radius
+	if same_sag:
+		zs += (radius_range - base_sag).reshape(ax.shape)
+
+	centers = np.stack((ax,ay,zs)).T.reshape(-1,3)
+	radii = radius_range
+	return centers, radii
+
 def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np.array):
 	""" returns centers and radii of a microlenslet in front of a sensor plate 
 	Args:
@@ -174,11 +206,13 @@ class PhaseOptic:
 		""" function to visualize profile of phase optic """
 		pass
 
-def raytrace_phaseoptic(cam_params, element):
+def raytrace_phaseoptic(cam_params, element, spp=1):
+	## TODO convert this to torch code 
 	""" Traces from camera origin to end of single layer phase optic 
 	Args:
 		cam_params: [H,W,f]
 		element: instance of class PhaseOptic
+		spp (samples per pixel) int: if more than 1, randomly sample n samples per pixel. 
 	Returns:
 		returns a dictionary with following keys: 
 		'rays_trace':[r0, r2, r4] : 
@@ -195,7 +229,7 @@ def raytrace_phaseoptic(cam_params, element):
 	radii = element.radii 
 
 	# Nx3 
-	cam_rays = rays_single_cam([H,W,f]).T.numpy() 
+	cam_rays = rays_single_cam([H,W,f], spp).T.numpy() 
 	
 	# Nx6 ,Nx:3 origin, Nx3: direction
 	rays = np.concatenate((np.zeros_like(cam_rays), cam_rays),axis=1)  

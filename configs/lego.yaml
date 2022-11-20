@@ -1,18 +1,20 @@
 datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
-savepath: /home/ubuntu/NeRF_CT/models/ 
-exp_name: Three_Images
+savepath: /home/ubuntu/NeRF_CT/models/SingleImage 
+exp_name: SingleImage
 lr_init: 0.0005
-lr_final: 0.0004
+lr_final: 0.00005
 Nf: 128
 Nc: 64 # coarse and fine is not implemented yet
-num_iters: 4000
+tn: 2
+tf: 6
+num_iters: 5000
 ckpt_model: 2000
 ckpt_loss: 100
 ckpt_images: 500
 batch_size: 4096
 half_res: True 
 val_idxs: [0,1]
-num_train_imgs: 25 # -1 to use all images in the train set
+num_train_imgs: 1 # -1 to use all images in the train set
 
 test_params:
   batch_size: 16000
@@ -26,4 +28,8 @@ test_params:
   animation: False # if True, only renders video 
   num_poses: 30
   theta: 30
+  Nf: 128
+  Nc: 64 # coarse and fine is not implemented yet
+  tn: 0.5
+  tf: 6
   
