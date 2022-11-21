@@ -227,7 +227,6 @@ def raytrace_phaseoptic(cam_params, element, spp=1):
 	mu = element.mu ## mu is assumed to be w.r.t air 
 	centers = element.centers # centers of spheres
 	radii = element.radii 
-
 	# Nx3 
 	cam_rays = rays_single_cam([H,W,f], spp).T.numpy() 
 	

@@ -104,6 +104,7 @@ def load_data(path, half_res=True, num_imgs=-1):
 	H, W = img.shape[:2]
 	f = W /(2 * np.tan(fov/2))
 	cam_params = [H,W,f]
+	
 
 	## TODO: Implement half res image loading 
 	samples = {} 

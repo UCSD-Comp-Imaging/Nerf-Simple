@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch
+import math
 import warnings
 
 def gamma(x, L=4):	
@@ -40,16 +41,29 @@ def rays_single_cam(cam_params, spp=1):
 	Args:
 		cam_params (list): [H, W, f]
 		spp (samples per pixel, int): if > 1 sample n samples randomly in each pixel
+		For NeRF , spp is always assumed to be 1 
 	Returns:
 		rays (torch Tensor): 3 x HW
 	"""
+
 	H , W, f  = cam_params
 	Hl = torch.arange(H) - H//2
 	Wl = torch.arange(W) - W//2
+
 	grid_x, grid_y = torch.meshgrid(Wl, Hl)
+	if spp > 1:
+		unif_samps = torch.rand(H,W,spp*2)*(Hl[1] - Hl[0])
+		grid_x_spp = unif_samps[:,:,:spp] + grid_x.unsqueeze(-1)
+		grid_y_spp = unif_samps[:,:,spp:] + grid_y.unsqueeze(-1)
+
+		rays_spp = torch.stack((grid_x_spp/f, -grid_y_spp/f, -1*torch.ones_like(grid_x_spp))).float()
+		rays_spp = rays_spp.permute(0,2,1,3)
+		rays_spp = torch.reshape(rays_spp, (3,-1))
+		return rays_spp
+
 	rays = torch.stack((grid_x/f, -grid_y/f, -1*torch.ones_like(grid_x))).float()
 	rays = rays.permute(0,2,1)
-	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800)
+	rays = torch.reshape(rays, (3,-1)) # 640K ray directions (if H,W = 800 and spp=1 else 640K*n)
 	return rays
 
 def polar_to_mat(theta):

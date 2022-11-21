@@ -95,8 +95,7 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', N=128, tn=2,
 
 	gt_img = rg.samples[im_set][im_idx]['img']
 	H,W = gt_img.shape[0], gt_img.shape[1]
-
-	NUM_RAYS = H*W # number of rays in image, currently hardcoded
+	NUM_RAYS = H*W 
 	net = net.cuda()
 	rays = rg.rays_dataset[im_set][im_idx*NUM_RAYS:(im_idx+1)*NUM_RAYS,:]
 	rgbs = [] 
