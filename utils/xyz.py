@@ -103,3 +103,22 @@ def poses_to_render(r, theta, n_phi=40):
 	phis = np.linspace(0, 360.0, n_phi)
 	poses = [torch.from_numpy(spherical_to_pose(r, theta, phi)).float() for phi in phis]
 	return poses
+
+def transform_rays(rays, pose):
+	""" transform rays (np.array Nx6) using given pose transformation
+	
+	Args:
+		rays (np.array) Nx6  :3 origin, 3: directions 
+		pose (np.array) 4x4 
+	Returns 
+		rays_transformed (np.array) Nx6 
+	"""
+	## applying sensor pose to generated rays
+	origins = rays[:,:3]
+	dirs = rays[:,3:] 
+	dirs = dirs / np.linalg.norm(dirs, axis=1, keepdims=True)
+	origins_h = np.hstack([origins, np.ones((rays.shape[0],1))])
+	new_origins = (pose @ origins_h.T).T[:,:3]
+	new_dirs = dirs @ pose[:3,:3].T
+	rays_transformed = np.concatenate((new_origins, new_dirs),axis=1)
+	return rays_transformed 

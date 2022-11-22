@@ -4,7 +4,7 @@ import math
 from utils.xyz import rays_single_cam
 
 
-def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_range_percent: float, same_sag: bool):
+def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_range_percent: float, same_sag: bool, base_radius=None):
 	""" return centers and radii of microlenslet in front of a sensor with 
 		random lens radii and lens centers. 
 	Args:
@@ -13,7 +13,7 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 		rscale: factor with which to scale radius
 		r_range_percent: percentage value between 0 and 1. randomly samples radii between B(1 +- radius_range).
 		B is base radius computed based on number of lenslets, and sensor size. 
-		same_sag (bool): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
+		same_sag (bool, always keep true): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
 	Returns:
 		centers, radii 
 	"""
@@ -21,14 +21,16 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 	H,W,f = cam_params 
 	h = H/f
 	w = W/f
-	base_radius = rscale*h / (2*num)
+	if base_radius is None:
+		base_radius = rscale*h / (2*num)
 	rlow = base_radius*(1 - r_range_percent)
 	rhigh = base_radius*(1 + r_range_percent)
 	radius_range = np.random.uniform(rlow, rhigh, size=num_lenslets)
 	ax, ay = np.meshgrid(np.linspace(-h/2,h/2,num), np.linspace(-w/2,w/2,num))
 	zs = -1*np.ones_like(ax) # assumed that all lenslets are on the image plane 
 
-	base_sag = base_radius
+	## TODO make the same sag if statement default
+	base_sag = rscale*h / (2*num)
 	if same_sag:
 		zs += (radius_range - base_sag).reshape(ax.shape)
 
@@ -36,12 +38,13 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 	radii = radius_range
 	return centers, radii
 
-def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np.array):
+def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np.array, base_radius=None):
 	""" returns centers and radii of a microlenslet in front of a sensor plate 
 	Args:
 		num_lenslets: Total number of lenslets on the sensor plane (should be a integer**2)
 		cam_params: [H,W,f]
 		rscale: factor with which to scale radius
+		base_radius : if specified to use as the radius instead of default 
 	Returns
 		centers: num_lenslets x 3
 		radii: list of radii num_lenslets x 1 
@@ -50,12 +53,15 @@ def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np
 	H,W,f = cam_params 
 	h = H/f
 	w = W/f
+	base_sag = rscale*h/(2*num)
+	if base_radius is None:
+		base_radius = base_sag
 	ax, ay = np.meshgrid(np.linspace(-h/2,h/2,num), np.linspace(-w/2,w/2,num))
 	zs = -1*np.ones_like(ax) # assumed that all lenslets are on the image plane 
+	zs += (np.ones(num_lenslets)*base_radius - base_sag).reshape(ax.shape)
 	centers = np.stack((ax,ay,zs)).T.reshape(-1,3)
-	radii = rscale*np.ones(num_lenslets)*h/(2*num)
+	radii = base_radius*np.ones(num_lenslets)
 	return centers, radii
-
 
 def refract(rays, n, mu):
 	""" returns refracted ray incident at surface with surface normal n and refractive index mu w.r.t air
@@ -72,6 +78,11 @@ def refract(rays, n, mu):
 	ni = np.sum(n*i, axis=1,keepdims=True)
 	t = mu*i + n*np.sqrt(1 - (mu**2)*(1 - ni**2)) - mu*n*ni
 	t = t * i_norms
+	## NaNs would occur in case of total internal reflection
+	nan_idxs = np.where(np.isnan(t).any(axis=1))[0]
+	if len(nan_idxs) > 0:
+		print(f"percentage of TIR: {100*len(nan_idxs)/ len(t)}")
+	t[nan_idxs] = i[nan_idxs]
 	return t 
 	
 
@@ -118,7 +129,6 @@ def intersect_sphere(rays, center, radius):
 	out[invalid] = rays_origin[invalid]
 	rays_out = np.concatenate((out, rays_direction), axis=1)
 	return rays_out, valid 
-
 
 def intersect_sphere_batch(rays, centers, radii):
 	""" compute intersection of rays with a batch of spheres 
@@ -265,6 +275,46 @@ def raytrace_phaseoptic(cam_params, element, spp=1):
 			'sphere_idxs':sphere_idx,
 			'valid_intersects': valid }
 	return out
+
+
+def gen_phase_optic(cam_params, num_lenses, optic_type='uniform',
+ 					r_range_percent=0.5, same_sag=True, radius_scale=1.5,
+					base_radius=None, **kwargs):
+	""" function to generate a phase optic element 
+	Args:
+		cam_params (list): [H,W,f]
+		num_lenses (int) : total number of microlens elements on phase optic
+		optic_type (str): 'uniform', 'random'
+		radius_scale (float): factor with which to scale radius
+		r_range_percent (float): percentage value between 0 and 1. randomly samples radii between B(1 +- radius_range).
+		B is base radius computed based on number of lenslets, and sensor size. 
+		same_sag (bool): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
+	returns:
+		element (PhaseOptic) : instance of class PhaseOptic 
+	"""
+	if optic_type == 'uniform':
+		centers, radii = unif_lenslet_params(num_lenses,cam_params,radius_scale, base_radius)
+	if optic_type == 'random':
+		centers, radii = random_lenslet_params(num_lenses, cam_params, radius_scale,
+		                                       r_range_percent, same_sag, base_radius) 
+	element = PhaseOptic(centers, radii, mu=1.5)
+	
+	return element 
+
+def phase_optic_rays(cam_params, phase_optic, spp=32):
+	""" function to generate rays exiting a phase optic in canonical space
+	Args:
+		cam_params (list) [H, W, f]
+		phase optic (PhaseOptic) 
+		spp : samples per pixel  
+	Returns:
+	"""
+	out = raytrace_phaseoptic(cam_params, phase_optic, spp=spp)
+	r0, r2, r4 = out['rays_trace']
+	valid = out['valid_intersects']
+	print(f"Percentage of valid intersects: {100*valid.shape[0]/r0.shape[0]} %")
+	print("-------------")
+	return r4 
 
 
 def visu3d_tracer(rays_list):

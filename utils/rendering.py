@@ -24,7 +24,6 @@ def render_nerf(rays, net, N, tn=2, tf=6):
 	B = rays.size(0)
 	t_bins = torch.linspace(tn,tf,N+1)
 	bin_diff = t_bins[1] - t_bins[0] 
-
 	unif_samps = torch.rand(rays.size(0),N)
 	ts = bin_diff* unif_samps + t_bins[:-1] # BxN 
 	ts = ts.cuda()

@@ -14,8 +14,8 @@ mi.set_variant('cuda_ad_rgb')
 
 from mitsuba import ScalarTransform4f as T
 import numpy as np 
-from utils.phaseoptic import unif_lenslet_params, random_lenslet_params, raytrace_phaseoptic, PhaseOptic, visu3d_tracer
-
+from utils.phaseoptic import gen_phase_optic, phase_optic_rays
+from utils.xyz import transform_rays
 
 def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800, height=800):
 	"""
@@ -70,7 +70,7 @@ def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800,
 
 ## Generate Training data 
 
-def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height):
+def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random=True):
 	"""
 	fov (float) : field of view in degree 
 	spp (int) : sample count for renderer
@@ -79,12 +79,17 @@ def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height):
 	phi_range (list) : [phi_min, phi_max, num_phi] to simulate num_phi values between phi_min and phi_max
 	theta_range (list) : [theta_min, theta_max, num_theta] 
 	r_range (list) : [r_min, r_max, num_r] to simulate
+	random (bool): If true, sample sensor poses randomly, else uniformly in interval
 	"""
 	# r, theta, phi = 3, -40, 0
-	phis = np.random.uniform(*phi_range)
-	rs = np.random.uniform(*r_range)
-	thetas = np.random.uniform(*theta_range)
-	
+	if random:
+		phis = np.random.uniform(*phi_range)
+		rs = np.random.uniform(*r_range)
+		thetas = np.random.uniform(*theta_range)
+	else:
+		phis = np.linspace(*phi_range)
+		rs = np.linspace(*r_range)
+		thetas = np.linspace(*theta_range)	
 	sensor_dicts = []
 	
 	for r in rs:
@@ -97,7 +102,7 @@ def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height):
 
 def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
                      spp=32, width=800, height=800, r_range=[1.75,1.8, 1], \
-					 phi_range=[30,360, 20], theta_range=[-30,-60, 1]):
+					 phi_range=[30,360, 20], theta_range=[-30,-60, 1], random_poses=True):
 	""" Generate standard mitsuba data without phase optic and save transforms_{data_type}.json 
 	scene_path (str): path to scene.xml file 
 	datapath (str): path where to store data
@@ -109,6 +114,7 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 	r_range (list) : [r_min, r_max, num_r] to simulate
 	phi_range (list) : [phi_min, phi_max, num_phi] to simulate num_phi values between phi_min and phi_max
 	theta_range (list) : [theta_min, theta_max, num_theta] 
+	random_poses (bool): If true, sample sensor poses randomly everytime function is called
 	"""
 	dn_integrator = mi.load_dict({'type':'aov', 'aovs': 'dd.z:depth,nn:sh_normal'})
 	train_mitsuba_json = {}
@@ -121,7 +127,7 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 	scene = mi.load_file(scene_path)
 	fov = camera_angle*180/(np.pi)
 	img = mi.render(scene)
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height)
+	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses)
 	
 	for i,sdict in tqdm(enumerate(sensor_dicts)):
 		sensor = sdict['sensor']
@@ -141,70 +147,11 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 		)
 	json.dump(train_mitsuba_json, open(os.path.join(datapath, f'transforms_{data_type}.json'),'w'))
 
-
-def gen_phase_optic(cam_params, num_lenses, optic_type='uniform',
- 					r_range_percent=0.5, same_sag=True, radius_scale=1.5):
-	""" function to generate a phase optic element 
-	Args:
-		cam_params (list): [H,W,f]
-		num_lenses (int) : total number of microlens elements on phase optic
-		optic_type (str): 'uniform', 'random'
-		radius_scale (float): factor with which to scale radius
-		r_range_percent (float): percentage value between 0 and 1. randomly samples radii between B(1 +- radius_range).
-		B is base radius computed based on number of lenslets, and sensor size. 
-		same_sag (bool): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
-	returns:
-		element (PhaseOptic) : instance of class PhaseOptic 
-	"""
-	if optic_type == 'uniform':
-		centers, radii = unif_lenslet_params(num_lenses,cam_params,radius_scale)
-	if optic_type == 'random':
-		centers, radii = random_lenslet_params(num_lenses, cam_params, radius_scale, r_range_percent, same_sag) 
-	element = PhaseOptic(centers, radii, mu=1.5)
-	
-	return element 
-
-def phase_optic_rays(cam_params, phase_optic, spp=32):
-	""" function to generate rays exiting a phase optic in canonical space
-	Args:
-		cam_params (list) [H, W, f]
-		phase optic (PhaseOptic) 
-		spp : samples per pixel  
-	Returns:
-		 
-	"""
-	out = raytrace_phaseoptic(cam_params, phase_optic, spp=spp)
-	r0, r2, r4 = out['rays_trace']
-	valid = out['valid_intersects']
-	print(f"Percentage of valid intersects: {100*valid.shape[0]/r0.shape[0]} %")
-	print("-------------")
-
-	return r4 
-
-def transform_rays(rays, pose):
-	""" transform rays (np.array Nx6) using given pose transformation
-	
-	Args:
-		rays (np.array) Nx6  :3 origin, 3: directions 
-		pose (np.array) 4x4 
-	Returns 
-		rays_transformed (np.array) Nx6 
-	"""
-	## applying sensor pose to generated rays
-	origins = rays[:,:3]
-	dirs = rays[:,3:] 
-	dirs = dirs / np.linalg.norm(dirs, axis=1, keepdims=True)
-	origins_h = np.hstack([origins, np.ones((rays.shape[0],1))])
-	new_origins = (pose @ origins_h.T).T[:,:3]
-	new_dirs = dirs @ pose[:3,:3].T
-	rays_transformed = np.concatenate((new_origins, new_dirs),axis=1)
-	return rays_transformed 
-
 def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 								camera_angle, spp=32, width=800, \
 								height=800, r_range=[1.75,1.8, 1], \
 								phi_range=[30,360, 20], theta_range=[-30,-60, 1], \
-								phase_optic_params=None):
+								random_poses=True, phase_optic_params=None):
 	"""
 	render data through a phase optic from multiple sensors. 
 	phase_optic_params (dict) with keys - num_lenses, optic_type,
@@ -229,7 +176,7 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 	phase_optic = gen_phase_optic(**phase_optic_params)
 	rays_phase_optic = phase_optic_rays(cam_params, phase_optic, spp)
 	## generating rays exiting the phase optic
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height)
+	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses)
 	mode = dr.ADMode.Primal
 	integrator = mi.load_dict({'type':'prb',
 						   'max_depth': 8,
@@ -252,22 +199,11 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 		)
 	mitsuba_json['phase_optic_centers'] = phase_optic.centers.tolist()
 	mitsuba_json['phase_optic_radii'] = phase_optic.radii.tolist()
+	mitsuba_json['phase_optic_params'] = phase_optic_params
 	json.dump(mitsuba_json, open(os.path.join(datapath, f'transforms_{data_type}.json'),'w'))
-	return imgs
+	# return imgs
 
-def integrator_to_np(L:mitsuba.cuda_ad_rgb.Color3f, active:drjit.cuda.ad.Bool, cam_params:list):
-	H,W,f = cam_params
-	NUM_PIX = H*W
-	L_np = np.array(L)
-	L_np_ = L_np.reshape(NUM_PIX,-1,3)
-
-	active_np = np.array(active)
-	active_np_ = active_np.reshape(NUM_PIX,-1,1)
-
-	L_np_ = np.sum(L_np_*active_np_, axis=1).reshape(H,W,3)	
-	return L_np_
-
-
+## TODO Function copied from mitsuba codebase, modified slightly. Need to clean this up with doc strings, or maybe replace
 def render_rays(integrator: mi.SamplingIntegrator,
 			scene: mi.Scene,
 			rays: mi.Ray3f,
@@ -336,6 +272,18 @@ def render_rays(integrator: mi.SamplingIntegrator,
 
 		return integrator.primal_image
 
+### Kind of miscellaneous functions, keeping them temporarily
+def integrator_to_np(L:mitsuba.cuda_ad_rgb.Color3f, active:drjit.cuda.ad.Bool, cam_params:list):
+	H,W,f = cam_params
+	NUM_PIX = H*W
+	L_np = np.array(L)
+	L_np_ = L_np.reshape(NUM_PIX,-1,3)
+
+	active_np = np.array(active)
+	active_np_ = active_np.reshape(NUM_PIX,-1,1)
+
+	L_np_ = np.sum(L_np_*active_np_, axis=1).reshape(H,W,3)	
+	return L_np_
 
 def visualize_integrator(L:mitsuba.cuda_ad_rgb.Color3f, active:drjit.cuda.ad.Bool, cam_params:list):
 	""" visualize the radiance values generated by integrator"""

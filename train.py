@@ -30,9 +30,12 @@ def train(params):
 		os.makedirs(os.path.join(params['savepath'], params['exp_name']))
 	writer = SummaryWriter('logs/run_{}/'.format(str(time.time())[-10:]))
 	batch_size = params['batch_size']
-	rg = RayGenerator(params['datapath'], params['half_res'], params['num_train_imgs'])
+	
+	pdkeys = ['train'] if params['train_with_phaseop'] else []
+	## TODO fix test.py similarly
+	rg = RayGenerator(params['datapath'], params['half_res'], params['num_train_imgs'], None, phase_data_keys=pdkeys)
 	train_imgs = torch.stack([torch.from_numpy(s['img']) for s in rg.samples['train']]).reshape(-1,3)
-
+		
 	## exponential Lr decay factor  
 	lr_start = params['lr_init']
 	lr_end = params['lr_final']
@@ -50,7 +53,6 @@ def train(params):
 		optimizer.zero_grad()
 		rgb, depth, alpha, acc, w = render_nerf(rays.cuda(), net, params['Nf'], params['tn'], params['tf'])
 		loss = criterion(rgb, gt_colors)
-		
 		loss.backward()
 		optimizer.step()
 		for p in optimizer.param_groups:

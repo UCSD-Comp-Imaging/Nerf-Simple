@@ -7,7 +7,7 @@ import re
 import torch
 from natsort import natsort_keygen, ns
 from utils.xyz import rays_single_cam
-from utils.phaseoptic import PhaseOptic, unif_lenslet_params, raytrace_phaseoptic
+from utils.phaseoptic import PhaseOptic, gen_phase_optic, phase_optic_rays
 
 
 def load_data(path, half_res=True, num_imgs=-1):
@@ -106,20 +106,39 @@ def load_data(path, half_res=True, num_imgs=-1):
 	cam_params = [H,W,f]
 	
 
-	## TODO: Implement half res image loading 
 	samples = {} 
+	## list of phase optic configurations
+	samples['train_phase_dicts'] = []
 	samples['train'] = train_samples
 	samples['test'] = test_samples
 	samples['val'] = val_samples
+
+	if 'phase_optic_params' in train_transform:
+		phase_dict = {}
+		## TODO change this to a for loop based on how multiple phase op configs are stored in train.json
+		phase_dict['phase_optic_params'] = train_transform['phase_optic_params']
+		phase_dict['phase_optic_centers'] = np.array(train_transform['phase_optic_centers'])
+		phase_dict['phase_optic_radii'] = np.array(train_transform['phase_optic_radii'])
+		## TODO keep appending multiple phase optic configs to this list 
+		samples['train_phase_dicts'].append(phase_dict)
+
 	return samples, cam_params   
 
-def rays_dataset(samples, cam_params, phase_optic=None):
-	""" Generates rays and camera origins for train test and val sets under diff camera poses""" 
+def rays_dataset(samples, cam_params, phase_optic=None, phase_optic_data_keys=['Train']):
+	""" Generates rays and camera origins for train test
+	    and val sets under diff camera poses
+	Args:
+		samples - generated from the function above 
+		cam_params - [H,W,f]
+		phase_optic - element of class PhaseOptic with centers and radii for phase optic
+		phase_optic_data_keys - subset list of ['train', 'val', 'test']
+	""" 
 	keys = ['train', 'test', 'val']
 	rays_1_cam = rays_single_cam(cam_params)
 	if phase_optic is not None:
-		out = raytrace_phaseoptic(cam_params, phase_optic)
-		_,_, rays_phaseop = out['rays_trace']
+		rays_phaseop = phase_optic_rays(cam_params, phase_optic, spp=1)
+		# out = raytrace_phaseoptic(cam_params, phase_optic, spp=1)
+		# _,_, rays_phaseop = out['rays_trace']
 		rays_phaseop = torch.from_numpy(rays_phaseop).t().float()
 	rays = {}
 	cam_origins = {}
@@ -127,34 +146,46 @@ def rays_dataset(samples, cam_params, phase_optic=None):
 	for k in keys:
 		num_images = len(samples[k])
 		transf_mats = torch.stack([s['transform'] for s in samples[k]])
-		if phase_optic is None:
+		if phase_optic is not None and k in phase_optic_data_keys:
+			## use phase optic rays only in train data not val and test
+			origins = torch.matmul(transf_mats[:,:3,:3], rays_phaseop[:3,:]) + transf_mats[:,:3,3:]
+			dirs = torch.matmul(transf_mats[:,:3,:3], rays_phaseop[3:,:])
+		else:
 			dirs =  torch.matmul(transf_mats[:,:3,:3], rays_1_cam)
 			origins = transf_mats[:,:3,3:]
 			origins = origins.expand(num_images,3,H*W) #Bx3xHW
-		else:
-			origins = torch.matmul(transf_mats[:,:3,:3], rays_phaseop[:3,:]) + transf_mats[:,:3,3:]
-			dirs = torch.matmul(transf_mats[:,:3,:3], rays_phaseop[3:,:])
+		
 		rays[k] = torch.cat((origins, dirs),dim=1).permute(0,2,1).reshape(-1, 6) # BHW x 6, number of cameras 
 
 	return rays
 
+	## TODO Create separate function for multipe phase optics ray generation and modify selection function
 class RayGenerator:
-	def __init__(self, path, half_res=True, num_imgs=-1, phase_dict=None):
+	def __init__(self, path, half_res=True, num_imgs=-1, test_phase_dict=None, phase_data_keys=[]):
+		"""
+		path: root data folder which has train,test,val folders and jsons
+		half_res: train at half resolution 
+		test_phase_dict: (dict) render images through a phase optic specified at inference if required
+		the phase optic is created using gen_phase_optic function with `test_phase_dict` as input
+		phase_data_keys: subset of ['Train', 'test', 'val']. phase optic ray tracing only for data types in this list 
+		"""
 		samples, cam_params = load_data(path, half_res, num_imgs)
 		self.samples = samples
 		self.cam_params = cam_params
-		self.H = cam_params[0]
-		self.W = cam_params[1]
-		self.f = cam_params[2]
-		self.phase_dict = phase_dict
-		if phase_dict is not None and self.phase_dict['use_phase_optic']:
-			num_lenses = phase_dict['num_lenses']
-			radius_scale = phase_dict['radius_scale']
-			## currently only uniform lenslets supported 
-			centers, radii = unif_lenslet_params(num_lenses,cam_params,radius_scale)
-			## generating max over 
-			phase_optic = PhaseOptic(centers, radii, mu=1.5)
-			self.rays_dataset = rays_dataset(self.samples, cam_params, phase_optic)
+		self.phase_dict = test_phase_dict
+		self.train_phase_dicts = samples['train_phase_dicts']
+		## TODO add support for test phase dicts 
+		if test_phase_dict is not None:
+			element = gen_phase_optic(cam_params, **test_phase_dict)
+			self.rays_dataset = rays_dataset(self.samples, cam_params, element, ['test'])
+		elif len(self.train_phase_dicts) > 0 and len(phase_data_keys)>0:
+			## currently use list of length 1 only, i.e. only 1 phase optic 
+			for phaseop in self.train_phase_dicts:
+				centers = phaseop['phase_optic_centers']
+				radii = phaseop['phase_optic_radii']
+				element = PhaseOptic(centers, radii, mu=1.5)
+			self.rays_dataset = rays_dataset(self.samples, cam_params, element, phase_data_keys)
+			## TODO create a list of rays_datasets and append rays dataset for multiple phase optics
 		else:
 			self.rays_dataset = rays_dataset(self.samples, cam_params)
 
@@ -182,7 +213,7 @@ class RayGenerator:
 			rays (torch Tensor): Nx6 
 			ray_ids: Nx1 
 		"""
-		NUM_RAYS = self.H * self.W
+		NUM_RAYS = self.cam_params[0] * self.cam_params[1]
 		data = []
 		rays_idxs = [] 
 		for im_idx in im_idxs:
