@@ -1,0 +1,34 @@
+phase_optic_params:
+  num_lenses: 100
+  optic_type: 'uniform'
+  r_range_percent: 0.5 
+  same_sag: True
+  radius_scale: 1.5
+  base_radius: None
+  use_phaseoptic: False
+
+datagen_params: 
+  scene_path: scenes/spaceship/scene.xml
+  datapath: data_mitsuba/spaceship/
+  data_type: train
+  camera_angle: 1.04711
+  spp: 64
+  width: 800
+  height: 800
+  r_range: [4,4.5,1]
+  phi_range: [0,360,10]
+  theta_range: [-70,-90,10]
+  random_poses: True
+
+datagen_params_nopo:
+  scene_path: scenes/spaceship/scene.xml
+  datapath: data_mitsuba/spaceship/
+  data_type: val
+  camera_angle: 1.04711
+  spp: 64
+  width: 800
+  height: 800
+  r_range: [4,4.5,1]
+  phi_range: [0,360,10]
+  theta_range: [-70,-90,2]
+  random_poses: True

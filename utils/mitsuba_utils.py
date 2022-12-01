@@ -15,37 +15,26 @@ mi.set_variant('cuda_ad_rgb')
 from mitsuba import ScalarTransform4f as T
 import numpy as np 
 from utils.phaseoptic import gen_phase_optic, phase_optic_rays
-from utils.xyz import transform_rays
+from utils.xyz import transform_rays, mitsuba_spherical_to_pose
 
-def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800, height=800):
+def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800, height=800, scene_center=np.zeros(3)):
 	"""
 	fov (float): fov of camera in degrees
 	pose (mitsuba ScalarTransform4f object): pose of camera / sensor
-	source orign is hardcoded, beaware
+	source orign/target is hardcoded, beaware
 	"""
 	# Apply two rotations to convert from spherical coordinates to world 3D coordinates.
-	origin = T.rotate([0, 1, 0], phi).rotate([0, 0, 1], theta)@mi.ScalarPoint3f([0, r, 0])
-	target = np.array([0.4, 0.45, 0.5])
+	origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f([0, 0, r])
+	# target = np.array([0.4, 0.45, 0.5]) - lego scene target 
+	target = np.array(scene_center)
 	origin = origin + target 
-	cam_pose = T.look_at(
+	cam_pose = T.translate(target).look_at(
 			origin=origin,
-			target=[0.4, 0.45, 0.5],
+			target=[0, 0, 0],
 			up=[0, 1, 0]
 		)
-
-	origin = np.array(origin)
-	target = np.array([0.4, 0.45, 0.5])
-	dir = (target - origin)/np.linalg.norm(origin-target)
-	up = np.array([0,1,0])
-
-	right = np.cross(dir, up) / np.linalg.norm(np.cross(up, dir))
-	up = np.cross(right, dir)
-
-
-	pose_r = np.eye(4)
-	pose_r[:3,:3] = np.vstack([right.T, up.T, -dir.T]).T
-	pose_r[:3,3] = origin
-
+	pose_r = np.array(cam_pose.matrix)
+	# pose_r1 = mitsuba_spherical_to_pose(r, theta, phi, scene_center)
 	out_dict = {}
 	out_dict['sensor'] = mi.load_dict({
 		'type': 'perspective',
@@ -70,7 +59,40 @@ def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800,
 
 ## Generate Training data 
 
-def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random=True):
+def get_scene_center(scene):
+	""" get center of all meshes in scene """
+	center = np.zeros(3)
+	for shape in scene.shapes()[1:]:
+		minc = np.array(shape.bbox().min)
+		maxc = np.array(shape.bbox().max)
+		center += (minc + maxc)/2
+
+	print(center / len(scene.shapes()))
+	# return np.array([0.3 ,0.5 ,0.])
+	return center / len(scene.shapes())
+
+
+def uniform_sphere_sample(num_samples, zsign=1, fix_seed=True):
+	""" sample num_samples on hemisphere (determined by zsign) of radius r,
+	    return corresponding theta and phi values. """
+	thetas = [] 
+	phis = []
+	if fix_seed:
+		print("fixing seed")
+		np.random.seed(0)
+	while(len(thetas) < num_samples):
+		v = np.zeros(3)
+		while (np.linalg.norm(v) < 0.001 or np.sign(v[2]) != zsign):
+			v = np.random.randn(3)
+		v = v / np.linalg.norm(v)
+		phi = 180*np.arctan2(v[1],v[0]) / np.pi
+		theta = 180*np.arctan2(np.sqrt(v[0]**2 + v[1]**2), v[2]) / np.pi
+		thetas.append(theta.astype(np.float32))
+		phis.append(phi.astype(np.float32))
+	return thetas, phis
+
+def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height,
+                random=True, scene_center=np.zeros(3)):
 	"""
 	fov (float) : field of view in degree 
 	spp (int) : sample count for renderer
@@ -82,21 +104,31 @@ def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random
 	random (bool): If true, sample sensor poses randomly, else uniformly in interval
 	"""
 	# r, theta, phi = 3, -40, 0
+	num_samples = len(np.linspace(*phi_range))*len(np.linspace(*theta_range)) 
+	print(f"num samples to generate: {num_samples}")
 	if random:
-		phis = np.random.uniform(*phi_range)
+		thetas, phis = uniform_sphere_sample(num_samples, zsign=1)
+		# phis = np.random.uniform(*phi_range)
+		rs = [r_range[0]]
 		rs = np.random.uniform(*r_range)
-		thetas = np.random.uniform(*theta_range)
+		# thetas = np.random.uniform(*theta_range)
 	else:
 		phis = np.linspace(*phi_range)
 		rs = np.linspace(*r_range)
 		thetas = np.linspace(*theta_range)	
 	sensor_dicts = []
 	
-	for r in rs:
-		for theta in thetas:
-			for phi in phis:
-				sensor_dict = gen_sensor(r, phi, theta, fov, spp, width, height)
-				sensor_dicts.append(sensor_dict)
+	if not random:
+		for r in rs:
+			for theta in thetas:
+				for phi in phis:
+					sensor_dict = gen_sensor(r, phi, theta, fov, spp, width, height, scene_center)
+					sensor_dicts.append(sensor_dict)
+	else:
+		for r in rs:
+			for theta, phi in zip(thetas, phis):
+				sensor_dict = gen_sensor(r, phi, theta, fov, spp, width, height, scene_center)
+				sensor_dicts.append(sensor_dict)	
 
 	return sensor_dicts
 
@@ -125,9 +157,11 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 		os.makedirs(savepath)
 
 	scene = mi.load_file(scene_path)
+	scene_center = get_scene_center(scene)
+	train_mitsuba_json['scene_center'] = scene_center.tolist()
 	fov = camera_angle*180/(np.pi)
 	img = mi.render(scene)
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses)
+	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses, scene_center)
 	
 	for i,sdict in tqdm(enumerate(sensor_dicts)):
 		sensor = sdict['sensor']
@@ -152,9 +186,9 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 								height=800, r_range=[1.75,1.8, 1], \
 								phi_range=[30,360, 20], theta_range=[-30,-60, 1], \
 								random_poses=True, phase_optic_params=None):
-	"""
+	""" 
 	render data through a phase optic from multiple sensors. 
-	phase_optic_params (dict) with keys - num_lenses, optic_type,
+	phase_optic_params (dict) with keys - num_lenses, optic_type, 
 	r_range_percent, same_sag, radius_scale
 	"""
 	imgs = []
@@ -168,15 +202,19 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 		os.makedirs(savepath)
 
 	scene = mi.load_file(scene_path)
+	scene_center = get_scene_center(scene)
+	mitsuba_json['scene_center'] = scene_center.tolist()
+	mitsuba_json['zdir'] = 1
 	img = mi.render(scene)
 	fov = camera_angle*180/(np.pi)
 	f = width /(2 * np.tan(camera_angle/2))
 	cam_params = [height, width, f]
 	phase_optic_params['cam_params'] = cam_params
+	phase_optic_params['zdir'] = 1 ## since using mitsuba to generate data
 	phase_optic = gen_phase_optic(**phase_optic_params)
-	rays_phase_optic = phase_optic_rays(cam_params, phase_optic, spp)
+	rays_phase_optic = phase_optic_rays(cam_params, phase_optic, spp, zdir=1)
 	## generating rays exiting the phase optic
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses)
+	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses, scene_center)
 	mode = dr.ADMode.Primal
 	integrator = mi.load_dict({'type':'prb',
 						   'max_depth': 8,
@@ -187,7 +225,6 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 		sensor_pose = sdict['sensor_pose']
 		rays_po = transform_rays(rays_phase_optic, sensor_pose)
 		rays_po = mi.Ray3f(o = rays_po[:,:3], d= rays_po[:,3:])
-
 		img = render_rays(integrator, scene, rays_po, sensor, spp=spp)
 		mi.util.write_bitmap(os.path.join(savepath, f'r_{i}.png'),img)
 		mitsuba_json['frames'].append(
@@ -201,7 +238,7 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 	mitsuba_json['phase_optic_radii'] = phase_optic.radii.tolist()
 	mitsuba_json['phase_optic_params'] = phase_optic_params
 	json.dump(mitsuba_json, open(os.path.join(datapath, f'transforms_{data_type}.json'),'w'))
-	# return imgs
+	# return imgsf
 
 ## TODO Function copied from mitsuba codebase, modified slightly. Need to clean this up with doc strings, or maybe replace
 def render_rays(integrator: mi.SamplingIntegrator,

@@ -12,6 +12,7 @@ from utils.rendering import *
 import argparse 
 import yaml 
 from tqdm import tqdm 
+from torchmetrics import StructuralSimilarityIndexMeasure
 
 def img_mse(gt, pred):
 	if not torch.is_tensor(gt):
@@ -25,6 +26,14 @@ def img_psnr(gt, pred):
 	psnr = 20*torch.log(torch.max(gt))/torch.log(ten) - 10 * torch.log(img_mse(gt, pred))/torch.log(ten)
 	return psnr 
 
+def img_ssim(gt, pred):
+	if not torch.is_tensor(gt):	
+		gt =torch.from_numpy(gt).float()
+	ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+	score = ssim(pred.permute(0,3,1,2), gt.permute(0,3,1,2))
+	return score
+
+
 def train(params):
 	if not os.path.exists(os.path.join(params['savepath'], params['exp_name'])):
 		os.makedirs(os.path.join(params['savepath'], params['exp_name']))
@@ -33,7 +42,7 @@ def train(params):
 	
 	pdkeys = ['train'] if params['train_with_phaseop'] else []
 	## TODO fix test.py similarly
-	rg = RayGenerator(params['datapath'], params['half_res'], params['num_train_imgs'], None, phase_data_keys=pdkeys)
+	rg = RayGenerator(params['datapath'], params['res_factor'], params['num_train_imgs'], None, phase_data_keys=pdkeys)
 	train_imgs = torch.stack([torch.from_numpy(s['img']) for s in rg.samples['train']]).reshape(-1,3)
 		
 	## exponential Lr decay factor  
@@ -41,9 +50,16 @@ def train(params):
 	lr_end = params['lr_final']
 	decay = np.exp(np.log(lr_end / lr_start) / params['num_iters'])
 	
-	net = Nerf().cuda()
+	Lp = params.get('Lp', 10)
+	Ld = params.get('Ld', 4)
+	hidden = params.get('H', 256)
+	print(Lp, Ld, hidden)
+	net = Nerf(Lp, Ld, hidden).cuda()
+	if params['pretrained_path'] is not None:
+		print("using pre trained path")
+		net.load_state_dict(torch.load(params['pretrained_path']))
 	criterion = nn.MSELoss()
-	optimizer = torch.optim.Adam(net.parameters(), lr=5e-4)
+	optimizer = torch.optim.Adam(net.parameters(), lr=lr_start)
 	## TODO: Add code to load state dict from pre-trained model
 	for i in tqdm(range(params['num_iters'])):
 		## main training loop 
@@ -55,8 +71,11 @@ def train(params):
 		loss = criterion(rgb, gt_colors)
 		loss.backward()
 		optimizer.step()
+
+		decay_steps = params['decay_step'] * 1000
+		lr = lr_start * (params['decay_rate'] ** (i / decay_steps))
 		for p in optimizer.param_groups:
-			p['lr'] = p['lr']*decay
+			p['lr'] = lr
 
 		## checkpointing and logging code 
 		if i % params['ckpt_loss'] == 0:
@@ -67,7 +86,7 @@ def train(params):
 		if i % params['ckpt_images'] == 0:
 			print("--- rendering image ---")
 			for ii in params['val_idxs']:
-				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=16000,\
+				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=params['render_batch'],\
 														  im_idx=ii, im_set='train',\
 														  N=params['Nf'], tn=params['tn'], tf=params['tf'])
 				writer.add_images(f'train/RGB_{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
@@ -75,15 +94,18 @@ def train(params):
 				writer.add_images(f'train/GT_{ii}', gt_img, global_step=i+1, dataformats='NHWC')
 				writer.add_scalar(f"Loss/Train_Img_MSE_{ii}", img_mse(gt_img, rgb_img), i+1)
 				writer.add_scalar(f"Loss/Train_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
+				writer.add_scalar(f"Loss/Train_Img_SSIM_{ii}", img_ssim(gt_img, rgb_img), i+1)
 
-				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=16000,\
+				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=params['render_batch'],\
 														  im_idx=ii, im_set='val',\
-														  N=params['Nf'], tn=params['tn'], tf=params['tf'])
-				writer.add_images(f'Val/RGB{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
-				writer.add_images(f'Val/Depth{ii}', depth_img, global_step=i+1, dataformats='NHWC')
-				writer.add_images(f'Val/GT{ii}', gt_img, global_step=i+1, dataformats='NHWC')
-				writer.add_scalar(f"Loss/Val_Img_MSE{ii}", img_mse(gt_img, rgb_img), i+1)
-				writer.add_scalar(f"Loss/Val_Img_PSNRf{ii}", img_psnr(gt_img, rgb_img), i+1)
+														  N=params['Nf'], tn=params['tn_val'], tf=params['tf_val'])
+				writer.add_images(f'Val/RGB_{ii}', rgb_img, global_step=i+1, dataformats='NHWC')
+				writer.add_images(f'Val/Depth_{ii}', depth_img, global_step=i+1, dataformats='NHWC')
+				writer.add_images(f'Val/GT_{ii}', gt_img, global_step=i+1, dataformats='NHWC')
+				writer.add_scalar(f"Loss/Val_Img_MSE_{ii}", img_mse(gt_img, rgb_img), i+1)
+				writer.add_scalar(f"Loss/Val_Img_PSNR_{ii}", img_psnr(gt_img, rgb_img), i+1)
+				writer.add_scalar(f"Loss/Val_Img_ssim_{ii}", img_ssim(gt_img, rgb_img), i+1)
+
 
 		if i% params['ckpt_model'] == 0:
 			print("saving model")

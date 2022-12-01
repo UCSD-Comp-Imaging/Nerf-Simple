@@ -1,0 +1,49 @@
+datapath: /home/ubuntu/NeRF_CT/data_mitsuba/spaceship
+savepath: /home/ubuntu/NeRF_CT/models/spaceship
+exp_name: 100_imgs
+lr_init: 0.0005
+lr_final: 0.00005
+pretrained_path: Null
+Nf: 256
+Nc: 64 # coarse and fine is not implemented yet
+tn: 2
+tf: 6
+# Lp: 0
+# Ld: 0
+tn_val: 2
+tf_val: 6
+num_iters: 100000
+ckpt_model: 5000
+ckpt_loss: 100
+ckpt_images: 500
+batch_size: 1024
+render_batch: 8000
+res_factor: 0.25 
+decay_step: 100 
+decay_rate: 0.1
+val_idxs: [10,15]
+num_train_imgs: -1 # -1 to use all images in the train set
+train_with_phaseop: False
+
+
+test_params:
+  batch_size: 8000
+  res_factor: 0.25
+  loadpath: /home/ubuntu/NeRF_CT/models/spaceship/100_imgs/1669648638.7773693.pth
+  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/spaceship
+  savepath: /home/ubuntu/NeRF_CT/models/spaceship
+  exp_name: spaceship_new
+  im_set: val 
+  im_idxs: [0] #[0,1,2,3,4,5,6,7,8,9,10,21] # renders rgb and depth for these indices from im_set
+  animation: True # if True, only renders video 
+  num_poses: 30
+  mitsuba_pose: True
+  theta: 70
+  Lp: 10
+  Ld: 4 
+  r: 4
+  Nf: 256
+  Nc: 64 # coarse and fine is not implemented yet
+  tn: 2
+  tf: 6
+  

@@ -1,5 +1,5 @@
-datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
-savepath: /home/ubuntu/NeRF_CT/models/lego_po_200
+datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/drums
+savepath: /home/ubuntu/NeRF_CT/models/drums
 exp_name: 50k_iters
 lr_init: 0.0005
 lr_final: 0.00005
@@ -8,10 +8,10 @@ Nf: 256
 Nc: 64 # coarse and fine is not implemented yet
 tn: 2
 tf: 6
-Lp: 10
-Ld: 4
-tn_val: 1.95
-tf_val: 5.95
+# Lp: 
+# Ld: 0
+tn_val: 2
+tf_val: 6
 num_iters: 100000
 ckpt_model: 5000
 ckpt_loss: 100
@@ -29,11 +29,10 @@ train_with_phaseop: False
 test_params:
   batch_size: 8000
   res_factor: 0.25
-  # loadpath: /home/ubuntu/NeRF_CT/models/lego_nerf_og_50k_no_pos/50k_iters/1669516066.0068932.pth
-  loadpath: /home/ubuntu/NeRF_CT/models/lego_nerf_og_50k/50k_iters/1669497365.874642.pth
-  datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
-  savepath: /home/ubuntu/NeRF_CT/results/lego
-  exp_name: og_lego_nerf50k
+  loadpath: /home/ubuntu/NeRF_CT/models/drums/50k_iters/1669610402.0464501.pth
+  datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/drums
+  savepath: /home/ubuntu/NeRF_CT/models/
+  exp_name: drums_video
   im_set: test 
   im_idxs: 0 #[0,5,50,58,65] # renders rgb and depth for these indices from im_set
   animation: False # if True, only renders video 

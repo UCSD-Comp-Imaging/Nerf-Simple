@@ -10,7 +10,7 @@ from utils.xyz import rays_single_cam
 from utils.phaseoptic import PhaseOptic, gen_phase_optic, phase_optic_rays
 
 
-def load_data(path, half_res=True, num_imgs=-1):
+def load_data(path, res_factor=1, num_imgs=-1):
 	"""
 	Assume path has the following structure - 
 	path/ -
@@ -58,7 +58,6 @@ def load_data(path, half_res=True, num_imgs=-1):
 		num_val = len(val_img_paths)
 		num_test = len(test_img_paths)
 	else:
-
 		num_train = num_val = num_test = num_imgs
 
 	## generate training samples 
@@ -67,21 +66,19 @@ def load_data(path, half_res=True, num_imgs=-1):
 		train_img = cv2.cvtColor(cv2.imread(train_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = train_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
-		if half_res:
-			H,W = train_img.shape[:2]
-			train_img = cv2.resize(train_img, (W//2 , H//2 ), interpolation=cv2.INTER_AREA)
+		H,W = train_img.shape[:2]
+		train_img = cv2.resize(train_img, (int(W*res_factor) , int(H*res_factor)), interpolation=cv2.INTER_AREA)
 		train_samples.append({'img': train_img, 'transform':transform, 'metadata':metadata})
 
 	## generate val samples 
+	print(num_val)
 	val_samples = [] 
 	for i in range(num_val):
 		val_img = cv2.cvtColor(cv2.imread(val_img_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = val_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
-		if half_res:
-			H,W = val_img.shape[:2]
-			val_img = cv2.resize(val_img, (W//2, H//2), interpolation=cv2.INTER_AREA)
-
+		H,W = val_img.shape[:2]
+		val_img = cv2.resize(val_img, (int(W*res_factor), int(H*res_factor)), interpolation=cv2.INTER_AREA)
 		val_samples.append({'img': val_img, 'transform':transform, 'metadata':metadata})
 	
 
@@ -92,9 +89,8 @@ def load_data(path, half_res=True, num_imgs=-1):
 		img_normal = cv2.cvtColor(cv2.imread(test_normal_paths[i]), cv2.COLOR_BGR2RGB) / 255.0
 		metadata = test_transform['frames'][i]
 		transform = torch.from_numpy(np.array(metadata['transform_matrix'])).float()
-		if half_res:
-			H,W = img.shape[:2]
-			img = cv2.resize(img, (W//2 ,H//2), interpolation=cv2.INTER_AREA)
+		H,W = img.shape[:2]
+		img = cv2.resize(img, (int(W*res_factor), int(H*res_factor)), interpolation=cv2.INTER_AREA)
 
 		test_samples.append({'img': img, 'img_depth': img_depth, 'img_normal':img_normal,\
 			 				 'transform':transform, 'metadata':metadata})	
@@ -112,7 +108,14 @@ def load_data(path, half_res=True, num_imgs=-1):
 	samples['train'] = train_samples
 	samples['test'] = test_samples
 	samples['val'] = val_samples
+	
+	if 'scene_center' in train_transform:
+		samples['scene_center'] = np.array(train_transform['scene_center'])
 
+	if 'zdir' in train_transform:
+		samples['zdir'] = train_transform['zdir']
+	else:
+		samples['zdir'] = -1
 	if 'phase_optic_params' in train_transform:
 		phase_dict = {}
 		## TODO change this to a for loop based on how multiple phase op configs are stored in train.json
@@ -124,7 +127,7 @@ def load_data(path, half_res=True, num_imgs=-1):
 
 	return samples, cam_params   
 
-def rays_dataset(samples, cam_params, phase_optic=None, phase_optic_data_keys=['Train']):
+def rays_dataset(samples, cam_params, phase_optic=None, phase_optic_data_keys=['train']):
 	""" Generates rays and camera origins for train test
 	    and val sets under diff camera poses
 	Args:
@@ -134,11 +137,9 @@ def rays_dataset(samples, cam_params, phase_optic=None, phase_optic_data_keys=['
 		phase_optic_data_keys - subset list of ['train', 'val', 'test']
 	""" 
 	keys = ['train', 'test', 'val']
-	rays_1_cam = rays_single_cam(cam_params)
+	rays_1_cam = rays_single_cam(cam_params, zdir=samples['zdir'])
 	if phase_optic is not None:
-		rays_phaseop = phase_optic_rays(cam_params, phase_optic, spp=1)
-		# out = raytrace_phaseoptic(cam_params, phase_optic, spp=1)
-		# _,_, rays_phaseop = out['rays_trace']
+		rays_phaseop = phase_optic_rays(cam_params, phase_optic, spp=1, zdir=samples['zdir'])
 		rays_phaseop = torch.from_numpy(rays_phaseop).t().float()
 	rays = {}
 	cam_origins = {}
@@ -161,7 +162,7 @@ def rays_dataset(samples, cam_params, phase_optic=None, phase_optic_data_keys=['
 
 	## TODO Create separate function for multipe phase optics ray generation and modify selection function
 class RayGenerator:
-	def __init__(self, path, half_res=True, num_imgs=-1, test_phase_dict=None, phase_data_keys=[]):
+	def __init__(self, path, res_factor=1, num_imgs=-1, test_phase_dict=None, phase_data_keys=[]):
 		"""
 		path: root data folder which has train,test,val folders and jsons
 		half_res: train at half resolution 
@@ -169,13 +170,14 @@ class RayGenerator:
 		the phase optic is created using gen_phase_optic function with `test_phase_dict` as input
 		phase_data_keys: subset of ['Train', 'test', 'val']. phase optic ray tracing only for data types in this list 
 		"""
-		samples, cam_params = load_data(path, half_res, num_imgs)
+		samples, cam_params = load_data(path, res_factor, num_imgs)
 		self.samples = samples
 		self.cam_params = cam_params
 		self.phase_dict = test_phase_dict
 		self.train_phase_dicts = samples['train_phase_dicts']
 		## TODO add support for test phase dicts 
 		if test_phase_dict is not None:
+			test_phase_dict['zdir'] = samples['zdir']
 			element = gen_phase_optic(cam_params, **test_phase_dict)
 			self.rays_dataset = rays_dataset(self.samples, cam_params, element, ['test'])
 		elif len(self.train_phase_dicts) > 0 and len(phase_data_keys)>0:

@@ -29,11 +29,10 @@ def render_nerf(rays, net, N, tn=2, tf=6):
 	ts = ts.cuda()
 	origins = rays[:,:3] # Bx3
 	dirs = rays[:,3:]  # Bx3
-
+	dirs = dirs / torch.norm(dirs, dim=1, keepdim=True)	
 	disp = dirs.unsqueeze(-1)*ts.unsqueeze(1) # Bx1x3 * BxNx1 = Bx3xN
 	
 	locs = origins.unsqueeze(-1) + disp # Bx3x1 + Bx3xN = Bx3xN 
-	dirs = dirs / torch.norm(dirs, dim=1, keepdim=True)	
 	query_pts = torch.cat((locs, dirs.unsqueeze(-1).expand(-1,-1,N)),dim=1) # Bx6xN
 	query_pts = query_pts.permute(0,2,1) # BxNx6
 	query_pts = query_pts.reshape(-1,6)
@@ -116,7 +115,7 @@ def render_image(net, rg, batch_size=64000, im_idx=0, im_set='val', N=128, tn=2,
 	return rgb_img, depth_img, gt_img
 
 
-def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=None, N=128, tn=2, tf=6):
+def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=None, N=128, tn=2, tf=6, zdir=-1):
 	""" render an image and depth map from a given set of poses 
 	Args:
 		net: instance of Nerf() model loaded with params 
@@ -126,6 +125,7 @@ def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=No
 		N: number of samples per ray 
 		tn: lower limit of distance along ray 
 		tf: upper limit of distance along ray
+		zdir: +1 / -1 governs whether camera looks at +ve z or -ve z to generate canonical rays
 	Returns:
 		An animation of poses 
 	"""
@@ -133,7 +133,7 @@ def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=No
 	num_imgs = len(poses)
 	NUM_RAYS = H*W # number of rays in image
 	net = net.cuda()
-	rays_1_cam = rays_single_cam(cam_params)
+	rays_1_cam = rays_single_cam(cam_params, zdir=zdir)
 	transf_mats = torch.stack(poses)
 	rays_dataset = torch.matmul(transf_mats[:,:3,:3], rays_1_cam)
 	cam_origins = transf_mats[:,:3,3:]

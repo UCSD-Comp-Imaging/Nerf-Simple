@@ -1,0 +1,34 @@
+phase_optic_params:
+  num_lenses: 100
+  optic_type: 'uniform'
+  r_range_percent: 0.5 
+  same_sag: True
+  radius_scale: 1.8
+  base_radius: Null
+  use_phaseoptic: True
+
+datagen_params: 
+  scene_path: scenes/lego/scene.xml
+  datapath: data_mitsuba/lego_EXP1_Pi/
+  data_type: train
+  camera_angle: 0.6911
+  spp: 32
+  width: 200
+  height: 200
+  r_range: [2.0,2.5,1]
+  phi_range: [0,360,20]
+  theta_range: [0,50,5]
+  random_poses: True
+
+datagen_params_nopo:
+  scene_path: scenes/lego/scene.xml
+  datapath: data_mitsuba/lego_EXP1_Pi/
+  data_type: val
+  camera_angle: 0.6911
+  spp: 32
+  width: 200
+  height: 200
+  r_range: [2,2.5,1]
+  phi_range: [0,360,2]
+  theta_range: [0, 50, 5]
+  random_poses: True

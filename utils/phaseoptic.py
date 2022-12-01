@@ -4,7 +4,8 @@ import math
 from utils.xyz import rays_single_cam
 
 
-def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_range_percent: float, same_sag: bool, base_radius=None):
+def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float,
+						  r_range_percent: float, same_sag: bool, base_radius=None, zdir=-1):
 	""" return centers and radii of microlenslet in front of a sensor with 
 		random lens radii and lens centers. 
 	Args:
@@ -14,6 +15,7 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 		r_range_percent: percentage value between 0 and 1. randomly samples radii between B(1 +- radius_range).
 		B is base radius computed based on number of lenslets, and sensor size. 
 		same_sag (bool, always keep true): keep the sag on the lens array same for all lenslets, by adjusting lens centers 
+		zdir (int) : +1 or -1 indicating whether camera faces positive z or negative z 
 	Returns:
 		centers, radii 
 	"""
@@ -27,7 +29,7 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 	rhigh = base_radius*(1 + r_range_percent)
 	radius_range = np.random.uniform(rlow, rhigh, size=num_lenslets)
 	ax, ay = np.meshgrid(np.linspace(-h/2,h/2,num), np.linspace(-w/2,w/2,num))
-	zs = -1*np.ones_like(ax) # assumed that all lenslets are on the image plane 
+	zs = zdir*np.ones_like(ax) # assumed that all lenslets are on the image plane 
 
 	## TODO make the same sag if statement default
 	base_sag = rscale*h / (2*num)
@@ -38,17 +40,20 @@ def random_lenslet_params(num_lenslets: int, cam_params: list, rscale: float, r_
 	radii = radius_range
 	return centers, radii
 
-def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np.array, base_radius=None):
+def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np.array,
+						base_radius=None, zdir=-1):
 	""" returns centers and radii of a microlenslet in front of a sensor plate 
 	Args:
 		num_lenslets: Total number of lenslets on the sensor plane (should be a integer**2)
 		cam_params: [H,W,f]
 		rscale: factor with which to scale radius
-		base_radius : if specified to use as the radius instead of default 
+		base_radius : if specified to use as the radius instead of default
+		zdir (int) : +1 or -1 indicating whether camera faces positive z or negative z  
 	Returns
 		centers: num_lenslets x 3
 		radii: list of radii num_lenslets x 1 
 	"""
+	assert zdir != 1 or zdir != -1, "zdir can be +1 or -1"
 	num = math.isqrt(num_lenslets)
 	H,W,f = cam_params 
 	h = H/f
@@ -56,8 +61,9 @@ def unif_lenslet_params(num_lenslets: int, cam_params: list, rscale: float or np
 	base_sag = rscale*h/(2*num)
 	if base_radius is None:
 		base_radius = base_sag
+	print(f"base_radius: {base_radius}")
 	ax, ay = np.meshgrid(np.linspace(-h/2,h/2,num), np.linspace(-w/2,w/2,num))
-	zs = -1*np.ones_like(ax) # assumed that all lenslets are on the image plane 
+	zs = zdir*np.ones_like(ax) # assumed that all lenslets are on the image plane 
 	zs += (np.ones(num_lenslets)*base_radius - base_sag).reshape(ax.shape)
 	centers = np.stack((ax,ay,zs)).T.reshape(-1,3)
 	radii = base_radius*np.ones(num_lenslets)
@@ -216,7 +222,7 @@ class PhaseOptic:
 		""" function to visualize profile of phase optic """
 		pass
 
-def raytrace_phaseoptic(cam_params, element, spp=1):
+def raytrace_phaseoptic(cam_params, element, spp=1, zdir=-1):
 	## TODO convert this to torch code 
 	""" Traces from camera origin to end of single layer phase optic 
 	Args:
@@ -238,20 +244,20 @@ def raytrace_phaseoptic(cam_params, element, spp=1):
 	centers = element.centers # centers of spheres
 	radii = element.radii 
 	# Nx3 
-	cam_rays = rays_single_cam([H,W,f], spp).T.numpy() 
-	
+	cam_rays = rays_single_cam([H,W,f], spp, zdir).T.numpy() 
+
 	# Nx6 ,Nx:3 origin, Nx3: direction
 	rays = np.concatenate((np.zeros_like(cam_rays), cam_rays),axis=1)  
 	
 	## r0 stores rays originating from camera. Image plane assumed at [0, 0, -1]
 	r0 = rays
-	rays = intersect_plane(rays, np.array([0., 0., -1.]), np.array([0., 0., -1.]))
-	
+
+	rays = intersect_plane(rays, np.array([0., 0., zdir]), np.array([0., 0., zdir]))
 	## r1 stores rays at the first intersection with imaging plane 
 	r1 = rays
 	plane_normals = np.zeros_like(cam_rays)
 	## normal vector at each point on plane assumed to be [0, 0, -1]
-	plane_normals[:,2] = -1
+	plane_normals[:,2] = zdir
 	rays_refrac = refract(rays[:,3:], plane_normals, 1/mu)
 	rays = np.concatenate((rays[:,:3], rays_refrac), axis=1)
 	
@@ -292,16 +298,20 @@ def gen_phase_optic(cam_params, num_lenses, optic_type='uniform',
 	returns:
 		element (PhaseOptic) : instance of class PhaseOptic 
 	"""
+	if 'zdir' in kwargs.keys():
+		zdir= kwargs['zdir']
+	else:
+		zdir = -1
 	if optic_type == 'uniform':
-		centers, radii = unif_lenslet_params(num_lenses,cam_params,radius_scale, base_radius)
+		centers, radii = unif_lenslet_params(num_lenses,cam_params,radius_scale, base_radius, zdir)
 	if optic_type == 'random':
 		centers, radii = random_lenslet_params(num_lenses, cam_params, radius_scale,
-		                                       r_range_percent, same_sag, base_radius) 
+		                                       r_range_percent, same_sag, base_radius, zdir) 
 	element = PhaseOptic(centers, radii, mu=1.5)
 	
 	return element 
 
-def phase_optic_rays(cam_params, phase_optic, spp=32):
+def phase_optic_rays(cam_params, phase_optic, spp=32, zdir=-1):
 	""" function to generate rays exiting a phase optic in canonical space
 	Args:
 		cam_params (list) [H, W, f]
@@ -309,7 +319,7 @@ def phase_optic_rays(cam_params, phase_optic, spp=32):
 		spp : samples per pixel  
 	Returns:
 	"""
-	out = raytrace_phaseoptic(cam_params, phase_optic, spp=spp)
+	out = raytrace_phaseoptic(cam_params, phase_optic, spp=spp, zdir=zdir)
 	r0, r2, r4 = out['rays_trace']
 	valid = out['valid_intersects']
 	print(f"Percentage of valid intersects: {100*valid.shape[0]/r0.shape[0]} %")

@@ -1,40 +1,56 @@
-datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
-savepath: /home/ubuntu/NeRF_CT/models/ 
-exp_name: LargeScale
+datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP1_Pi
+savepath: /home/ubuntu/NeRF_CT/models/lego_EXP1_Pi
+exp_name: imgsize400
 lr_init: 0.0005
 lr_final: 0.00005
-Nf: 128
+pretrained_path: Null
+Nf: 256
 Nc: 64 # coarse and fine is not implemented yet
-tn: 2
-tf: 6 
-num_iters: 4000
-ckpt_model: 2000
+tn: 1
+tf: 5
+Lp: 10
+Ld: 4
+tn_val: 2
+tf_val: 6
+num_iters: 100000
+ckpt_model: 5000
 ckpt_loss: 100
 ckpt_images: 500
-batch_size: 4096
-half_res: True 
+batch_size: 1024
+render_batch: 8000
+res_factor: 1
+decay_step: 100 
+decay_rate: 0.1
 val_idxs: [0,1]
 num_train_imgs: -1 # -1 to use all images in the train set
+train_with_phaseop: True
+
 
 test_params:
-  batch_size: 16000
-  half_res: True 
-  loadpath: /home/ubuntu/NeRF_CT/models/Three_Images/1666742866.6157136.pth
-  datapath: /home/ubuntu/NeRF_CT/data/nerf_synthetic/lego
-  savepath: /home/ubuntu/NeRF_CT/results/lego
-  exp_name: mynerf_phase_optic_64_1.5
+  batch_size: 8000
+  res_factor: 1 
+  # loadpath: /home/ubuntu/NeRF_CT/models/lego_po_200/imgsize200/1669665593.8860316.pth
+  loadpath: /home/ubuntu/NeRF_CT/models/lego_EXP1_Pi/imgsize400/1669771123.5378962.pth
+  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP1_Pi
+  savepath: /home/ubuntu/NeRF_CT/results/lego_EXP1_Pi
+  exp_name: imsize200
   im_set: test 
-  im_idxs: [0,5,50,58,65] # renders rgb and depth for these indices from im_set
-  animation: False # if True, only renders video 
-  num_poses: 30
+  im_idxs: [1] # renders rgb and depth for these indices from im_set
+  animation: True # if True, only renders video 
+  num_poses: 3
   theta: 30
+  Nf: 256
+  Nc: 64 # coarse and fine is not implemented yet
+  r: 2
+  tn: 1
+  tf: 5
+  mitsuba_pose: True
   phase_optic:
-    use_phase_optic: True
+    use_phase_optic: False
     type: uniform 
     num_lenses: 64
-    radius: auto
     radius_scale: 1.5
-    Nf: 128
+    Nf: 256
     Nc: 64 # coarse and fine is not implemented yet
     tn: 0.5
     tf: 6
