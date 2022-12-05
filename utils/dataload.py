@@ -201,7 +201,9 @@ class RayGenerator:
 			ray_ids: Nx1 
 		"""
 		data = self.rays_dataset[mode]
-		ray_ids = torch.randperm(data.size(0))[:N]
+		dataset_size = data.size(0)
+		ray_ids = torch.randint(0, dataset_size, (N,))
+		# ray_ids = torch.randperm(data.size(0))[:N]
 		rays = data[ray_ids,:]
 		return rays, ray_ids
 
