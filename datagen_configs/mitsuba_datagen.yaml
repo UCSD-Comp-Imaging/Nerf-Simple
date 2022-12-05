@@ -1,4 +1,3 @@
-
 phase_optic_params:
 	num_lenses: 100
 	optic_type: 'uniform'

@@ -21,7 +21,8 @@ if __name__=="__main__":
 
 	with open(args.config_path) as f:
 		params = yaml.load(f, Loader=yaml.FullLoader)
-
+	print("fixing seed")
+	np.random.seed(0)
 	phase_optic_params = params['phase_optic_params']
 	datagen_params = params['datagen_params']
 	datagen_params_nopo = params['datagen_params_nopo']

@@ -17,14 +17,18 @@ import numpy as np
 from utils.phaseoptic import gen_phase_optic, phase_optic_rays
 from utils.xyz import transform_rays, mitsuba_spherical_to_pose
 
-def gen_sensor(r:float, phi: float, theta: float, fov:float, spp=256, width=800, height=800, scene_center=np.zeros(3)):
+def gen_sensor(r:float or list, phi: float, theta: float, fov:float, spp=256, width=800, height=800, scene_center=np.zeros(3)):
 	"""
+	r: if float r is radius, movement along z - 0,0,r. if list, r is a 3d point 
 	fov (float): fov of camera in degrees
 	pose (mitsuba ScalarTransform4f object): pose of camera / sensor
 	source orign/target is hardcoded, beaware
 	"""
 	# Apply two rotations to convert from spherical coordinates to world 3D coordinates.
-	origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f([0, 0, r])
+	if type(r) == list:
+		origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f(r)	
+	else:
+		origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f([0, 0, r])
 	# target = np.array([0.4, 0.45, 0.5]) - lego scene target 
 	target = np.array(scene_center)
 	origin = origin + target 
@@ -72,14 +76,11 @@ def get_scene_center(scene):
 	return center / len(scene.shapes())
 
 
-def uniform_sphere_sample(num_samples, zsign=1, fix_seed=True):
+def uniform_sphere_sample(num_samples, zsign=1):
 	""" sample num_samples on hemisphere (determined by zsign) of radius r,
 	    return corresponding theta and phi values. """
 	thetas = [] 
 	phis = []
-	if fix_seed:
-		print("fixing seed")
-		np.random.seed(0)
 	while(len(thetas) < num_samples):
 		v = np.zeros(3)
 		while (np.linalg.norm(v) < 0.001 or np.sign(v[2]) != zsign):
@@ -118,6 +119,7 @@ def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height,
 		thetas = np.linspace(*theta_range)	
 	sensor_dicts = []
 	
+	## TODO remove this if else using itertools permutation functions
 	if not random:
 		for r in rs:
 			for theta in thetas:
@@ -130,7 +132,8 @@ def gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height,
 				sensor_dict = gen_sensor(r, phi, theta, fov, spp, width, height, scene_center)
 				sensor_dicts.append(sensor_dict)	
 
-	return sensor_dicts
+	## returing thetas and phis because converting back to r theta phi space is weird
+	return sensor_dicts, [rs, thetas, phis]
 
 def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
                      spp=32, width=800, height=800, r_range=[1.75,1.8, 1], \
@@ -159,9 +162,11 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 	scene = mi.load_file(scene_path)
 	scene_center = get_scene_center(scene)
 	train_mitsuba_json['scene_center'] = scene_center.tolist()
+	train_mitsuba_json['zdir'] = 1
 	fov = camera_angle*180/(np.pi)
 	img = mi.render(scene)
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses, scene_center)
+	sensor_dicts, sph_params = gen_sensors(r_range, phi_range, theta_range, fov,
+										   spp, width, height, random_poses, scene_center)
 	
 	for i,sdict in tqdm(enumerate(sensor_dicts)):
 		sensor = sdict['sensor']
@@ -176,7 +181,10 @@ def gen_mitsuba_data(scene_path, datapath, data_type, camera_angle, \
 			{
 				"file_path": f"./train/r_{i}",
 				"rotation": 0.012566370614359171, ## not useful .
-				"transform_matrix": sensor_pose
+				"transform_matrix": sensor_pose,
+				"r": sph_params[0][0].tolist(),
+				"theta": sph_params[1][i].tolist(),
+				"phi": sph_params[2][i].tolist()
 			}
 		)
 	json.dump(train_mitsuba_json, open(os.path.join(datapath, f'transforms_{data_type}.json'),'w'))
@@ -214,7 +222,8 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 	phase_optic = gen_phase_optic(**phase_optic_params)
 	rays_phase_optic = phase_optic_rays(cam_params, phase_optic, spp, zdir=1)
 	## generating rays exiting the phase optic
-	sensor_dicts = gen_sensors(r_range, phi_range, theta_range, fov, spp, width, height, random_poses, scene_center)
+	sensor_dicts, sph_params = gen_sensors(r_range, phi_range, theta_range, fov, spp,
+										   width, height, random_poses, scene_center)
 	mode = dr.ADMode.Primal
 	integrator = mi.load_dict({'type':'prb',
 						   'max_depth': 8,
@@ -232,6 +241,9 @@ def gen_mitsuba_phaseoptic_data(scene_path, datapath, data_type, \
 				"file_path": f"./train/r_{i}",
 				"rotation": 0.012566370614359171, ## not useful .
 				"transform_matrix": sensor_pose.tolist(),
+				"r": sph_params[0][0].tolist(),
+				"theta": sph_params[1][i].tolist(),
+				"phi": sph_params[2][i].tolist()
 			}
 		)
 	mitsuba_json['phase_optic_centers'] = phase_optic.centers.tolist()

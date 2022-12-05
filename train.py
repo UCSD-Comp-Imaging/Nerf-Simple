@@ -78,12 +78,12 @@ def train(params):
 			p['lr'] = lr
 
 		## checkpointing and logging code 
-		if i % params['ckpt_loss'] == 0:
+		if (i + 1) % params['ckpt_loss'] == 0:
 			writer.add_scalar("Loss/train", loss.item(), i+1)
 			writer.add_scalar("Train/lr", optimizer.param_groups[0]['lr'], i+1)
 			print(f'loss: {loss.item()} | epoch: {i+1} ')
 		
-		if i % params['ckpt_images'] == 0:
+		if (i + 1)% params['ckpt_images'] == 0:
 			print("--- rendering image ---")
 			for ii in params['val_idxs']:
 				rgb_img, depth_img, gt_img = render_image(net, rg, batch_size=params['render_batch'],\
@@ -107,7 +107,7 @@ def train(params):
 				writer.add_scalar(f"Loss/Val_Img_ssim_{ii}", img_ssim(gt_img, rgb_img), i+1)
 
 
-		if i% params['ckpt_model'] == 0:
+		if (i + 1)% params['ckpt_model'] == 0:
 			print("saving model")
 			tstamp = str(time.time())
 			torch.save(net.state_dict(), os.path.join(params['savepath'], params['exp_name'], tstamp+'.pth'))

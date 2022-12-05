@@ -110,6 +110,8 @@ def poses_to_render(r, theta, n_phi=40, mitsuba_pose=False, scene_center=np.zero
 		theta (degrees): altitude of camera (zenith)
 		n_phi: number of poses in phi direction 
 		scene_center - used for mitsuba scenes
+	Returns: 
+		list of 4x4 torch tensors
 	"""
 	phis = np.linspace(0, 360.0, n_phi)
 	if mitsuba_pose:
@@ -120,7 +122,10 @@ def poses_to_render(r, theta, n_phi=40, mitsuba_pose=False, scene_center=np.zero
 
 def mitsuba_spherical_to_pose(r, theta, phi, scene_center):
 	""" function to generate rendering trained nerf in mitsuba coordinate system """
-	origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f([0, 0, r])
+	if type(r) == list:
+		origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f(r)	
+	else:
+		origin = T.rotate([0, 1, 0], phi).rotate([1, 0, 0], -np.abs(theta))@mi.ScalarPoint3f([0, 0, r])
 	target = np.array(scene_center)
 	origin = origin + target 
 	cam_pose = T.translate(target).look_at(
@@ -131,9 +136,25 @@ def mitsuba_spherical_to_pose(r, theta, phi, scene_center):
 	pose_r = np.array(cam_pose.matrix)
 	return pose_r
 
+def cone_poses_to_render(r:float, phi: float, theta: float, 
+					   scene_center=np.zeros(3), half_angle=0., num_pts=30):
+	"""
+	sample poses along intersection of sphere and cone created along theta phi transformation axis 
+	"""
+	half_angle = np.radians(half_angle)
+	poses = []
+	phi_cones = np.linspace(0,2*np.pi,num_pts)
+	cone_pts = np.stack([r*np.sin(half_angle)*np.sin(phi_cones),
+					     r*np.sin(half_angle)*np.cos(phi_cones),	
+					     r*np.cos(half_angle)*np.ones(num_pts)]).T.astype(np.float32)
+
+	cone_pts_mi = cone_pts.tolist()
+	for pt in cone_pts_mi:
+		poses.append(torch.from_numpy(mitsuba_spherical_to_pose(pt, theta, phi, scene_center)))
+	return poses
+
 def transform_rays(rays, pose):
 	""" transform rays (np.array Nx6) using given pose transformation
-	
 	Args:
 		rays (np.array) Nx6  :3 origin, 3: directions 
 		pose (np.array) 4x4 

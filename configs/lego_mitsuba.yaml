@@ -1,16 +1,16 @@
-datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP1
-savepath: /home/ubuntu/NeRF_CT/models/lego_EXP1
+datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Base
+savepath: /home/ubuntu/NeRF_CT/results/po_exps/
 pretrained_path: Null #/home/ubuntu/NeRF_CT/results/mitsuba_phaseoptic_100_no_base/mitsuba_phaseop_nov23/1669223409.7615116.pth
-exp_name: imgsize400
+exp_name: lego_EXP2_Base_3imgs
 lr_init: 0.0005
 lr_final: 0.00005
-Nf: 192
+Nf: 256
 Nc: 64 # coarse and fine is not implemented yet
 tn: 1
-tf: 5
-tn_val: 1
+tf: 6
+tn_val: 2
 tf_val: 5
-num_iters: 20000
+num_iters: 10000
 ckpt_model: 2000
 ckpt_loss: 100
 ckpt_images: 200
@@ -19,8 +19,8 @@ res_factor: 1
 render_batch: 8000
 decay_step: 100 
 decay_rate: 0.1
-val_idxs: [0,5]
-num_train_imgs: -1 # -1 to use all images in the train set
+val_idxs: [0,1]
+num_train_imgs: 3 # -1 to use all images in the train set
 train_with_phaseop: False
 
 test_params:
@@ -28,21 +28,31 @@ test_params:
   res_factor: 1 
   # loadpath: /home/ubuntu/NeRF_CT/results/mitsuba_phaseoptic_100/mitsuba_phaseop_nov22/1669154800.7986343.pth
   # loadpath: /home/ubuntu/NeRF_CT/results/mitsuba_phaseoptic_100/mitsuba_phaseop_nov22/1669197920.8483336.pth
-  loadpath: /home/ubuntu/NeRF_CT/models/lego_EXP/imgsize400/1669684416.6712384.pth
-  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP
+  # loadpath: /home/ubuntu/NeRF_CT/models/lego_EXP/imgsize400/1669684416.6712384.pth
+  loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Base/1670051696.8572953.pth
+  # loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP2_Base_3imgs/1670131052.3436215.pth
+  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Base
   # loadpath: /home/ubuntu/NeRF_CT/results/mitsuba_phaseoptic_100_no_base/mitsuba_phaseop_nov23/1669223409.7615116.pth
   # datapath: /home/ubuntu/NeRF_CT/data_mitsuba_phaseoptic_100_no_base/lego
-  savepath: /home/ubuntu/NeRF_CT/results/lego_EXP
-  exp_name: imgsize400
-  im_set: test 
-  im_idxs: [0] # renders rgb and depth for these indices from im_set
-  animation: True # if True, only renders video 
+  savepath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Base/
+  exp_name: test_renders
+  im_set: test
+  im_idxs: [1,2,3,4] # renders rgb and depth for these indices from im_set
+  
+  animation: False # if True, only renders video 
   num_poses: 30
   mitsuba_pose: True # if true, rotate phi axis along Y , not z. useful if data was generated in Y up coordinate system instead of Z up
   theta: -30
   r: 2
+
   Nf: 256
   Nc: 64 # coarse and fine is not implemented yet
-  tn: 2
-  tf: 5
-  
+  tn: 1.8
+  tf: 6
+
+  ## cone poses params 
+  cone_animation: False
+  half_angle: 15
+  num_cone_pts: 30
+  cone_idx: 1
+  cone_im_set: train

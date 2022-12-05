@@ -63,6 +63,18 @@ def test(params):
 					N=params['Nf'], tn=params['tn'], tf=params['tf'], zdir=rg.samples.get('zdir', -1))
 		return
 
+	if params['cone_animation']:
+		print("cone animation")
+		cone_idx = params['cone_idx']
+		im_set = params['cone_im_set']
+		cone_params = rg.samples[im_set][cone_idx]['metadata']
+		r, theta, phi = cone_params['r'], cone_params['theta'], cone_params['phi'] 
+		poses = cone_poses_to_render(r, theta, phi, rg.samples['scene_center'],
+								   params['half_angle'], params['num_cone_pts'])
+		render_poses(net, poses, cam_params, batch_size, savepath,\
+					N=params['Nf'], tn=params['tn'], tf=params['tf'], zdir=rg.samples.get('zdir', -1))
+		return 
+
 	im_set = params['im_set'] # can be 'train', 'test', 'val' depending on whcich images to render
 	print(f"saving images to {params['savepath']}")
 	idxs = params['im_idxs'] if type(params['im_idxs']) is list else list(range(len(rg.samples[im_set])))

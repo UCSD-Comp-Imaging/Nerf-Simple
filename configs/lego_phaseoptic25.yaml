@@ -1,6 +1,6 @@
-datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Punif
-savepath: /home/ubuntu/NeRF_CT/results/po_exps/
-exp_name: lego_EXP2_Punif_3imgs
+datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Punif25
+savepath: /home/ubuntu/NeRF_CT/results/po_exps
+exp_name: lego_EXP2_Punif25_3imgs
 lr_init: 0.0005
 lr_final: 0.00005
 pretrained_path: Null
@@ -30,13 +30,12 @@ test_params:
   batch_size: 8000
   res_factor: 1 
   # loadpath: /home/ubuntu/NeRF_CT/models/lego_po_200/imgsize200/1669665593.8860316.pth
-  # loadpath: /home/ubuntu/NeRF_CT/models/lego_EXP1_Pi/imgsize400/1669771123.5378962.pth
-  # loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP2_Punif_3imgs/1670134915.5931547.pth
-  loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Punif/1670067354.9239151.pth
-  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Punif
-  savepath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Punif
+  # loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP2_Punif25_3imgs/1670138442.0786965.pth 
+  loadpath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Punif25/1670082920.9727788.pth
+  datapath: /home/ubuntu/NeRF_CT/data_mitsuba/lego_EXP2_Punif25
+  savepath: /home/ubuntu/NeRF_CT/results/po_exps/lego_EXP1_Punif25
   exp_name: test_renders
-  im_set: test
+  im_set: test 
   im_idxs: [1,2,3,4] # renders rgb and depth for these indices from im_set
   animation: False # if True, only renders video 
   num_poses: 30
@@ -46,7 +45,7 @@ test_params:
   r: 2
   tn: 1.8
   tf: 5
-  mitsuba_pose: True
+  mitsuba_pose: True # use mitsuba functions to generate pose for data generated in mitsuba3
   phase_optic:
     use_phase_optic: False
     type: uniform 

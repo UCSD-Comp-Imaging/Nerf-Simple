@@ -119,7 +119,7 @@ def render_poses(net, poses, cam_params, batch_size, savepath='', phase_optic=No
 	""" render an image and depth map from a given set of poses 
 	Args:
 		net: instance of Nerf() model loaded with params 
-		poses: list of 4x4 (np.array) camera poses in which scene is to be rendered
+		poses: list of 4x4 (torch.tensor) camera poses in which scene is to be rendered
 		cam_params: [H, W, f]
 		batch_size: batch size of rays 
 		N: number of samples per ray 
