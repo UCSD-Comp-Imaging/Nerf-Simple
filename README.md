@@ -5,10 +5,13 @@ This is a simplified implementation of NeRF, without hierarchical sampling. The 
 
 
 
+<video controls="" width="200" height="200" muted="" loop="" autoplay="">
+<source src="https://user-images.githubusercontent.com/114626135/205836656-41e96935-c296-463e-a5eb-d227928cbda8.mp4" type="video/mp4">
+</video>
 
-https://user-images.githubusercontent.com/114626135/205836656-41e96935-c296-463e-a5eb-d227928cbda8.mp4
-
-https://user-images.githubusercontent.com/114626135/205836681-331e3b9f-c6ec-4356-ab03-d9556ff566f9.mp4
+<video controls="" width="800" height="500" muted="" loop="" autoplay="">
+<source src="https://user-images.githubusercontent.com/114626135/205836681-331e3b9f-c6ec-4356-ab03-d9556ff566f9.mp4" type="video/mp4">
+</video>
 
 https://user-images.githubusercontent.com/114626135/197914242-6efba591-2452-41ac-86bb-bd145aab65c2.mov
 
