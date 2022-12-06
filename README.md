@@ -5,6 +5,11 @@ This is a simplified implementation of NeRF, without hierarchical sampling. The 
 
 
 
+
+https://user-images.githubusercontent.com/114626135/205836656-41e96935-c296-463e-a5eb-d227928cbda8.mp4
+
+https://user-images.githubusercontent.com/114626135/205836681-331e3b9f-c6ec-4356-ab03-d9556ff566f9.mp4
+
 https://user-images.githubusercontent.com/114626135/197914242-6efba591-2452-41ac-86bb-bd145aab65c2.mov
 
 
@@ -20,6 +25,9 @@ pip install -r requirements.txt
 
 Install training data for lego scene . Refer to [NeRF](https://www.matthewtancik.com/nerf) for other datasets. 
 ```
+
+
+
 bash download_data.sh
 ```
 
@@ -43,3 +51,20 @@ python3 test.py --config configs/lego.yaml
 - [ ] Support for LLF data
 - [ ] Integrate ColMap for training on real datasets 
 - [ ] Versioning the packages in requirements
+
+
+
+
+
+## Phase Optic results 
+
+https://user-images.githubusercontent.com/114626135/205836930-aaa52649-9419-4827-b6c2-963bdce6ba90.mp4
+
+
+https://user-images.githubusercontent.com/114626135/205836948-182975b9-e404-48a2-ac91-8adbfd63a5a9.mp4
+
+
+https://user-images.githubusercontent.com/114626135/205836916-3bb19038-bfef-4089-8256-ee8b23231df8.mp4
+
+
+
