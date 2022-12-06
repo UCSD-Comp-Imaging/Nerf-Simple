@@ -61,13 +61,10 @@ python3 test.py --config configs/lego.yaml
 
 ## Phase Optic results 
 
-https://user-images.githubusercontent.com/114626135/205836930-aaa52649-9419-4827-b6c2-963bdce6ba90.mp4
 
 
-https://user-images.githubusercontent.com/114626135/205836948-182975b9-e404-48a2-ac91-8adbfd63a5a9.mp4
 
 
-https://user-images.githubusercontent.com/114626135/205836916-3bb19038-bfef-4089-8256-ee8b23231df8.mp4
-
+https://user-images.githubusercontent.com/114626135/205840333-8494dede-79d4-4bdf-969b-694397402b50.mov
 
 
