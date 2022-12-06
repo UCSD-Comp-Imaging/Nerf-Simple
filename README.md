@@ -62,9 +62,24 @@ python3 test.py --config configs/lego.yaml
 ## Phase Optic results 
 
 
-
-
-
+On training the NeRF model on 3 viewpoints, without any phase optic used for generating images
 https://user-images.githubusercontent.com/114626135/205840333-8494dede-79d4-4bdf-969b-694397402b50.mov
+
+
+
+On training the NeRF model on 3 viewpoints, with 100 lenslet uniform phase optic used for generating images
+
+
+
+https://user-images.githubusercontent.com/114626135/205841079-5671d22a-c736-429f-bf5f-ddf834d6fac1.mov
+
+
+
+On training the NeRF model on 3 viewpoints, with 100 lenslet uniform phase optic used for generating images
+
+
+
+
+https://user-images.githubusercontent.com/114626135/205841623-469e6653-ebda-4d02-89be-fa82adefd24a.mov
 
 
